@@ -11,7 +11,6 @@ import android.view.View.VISIBLE
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.animation.BounceInterpolator
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.core.app.NotificationManagerCompat
@@ -21,7 +20,6 @@ import androidx.core.view.updateLayoutParams
 import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
@@ -36,11 +34,13 @@ import kotlinx.android.synthetic.main.item_list_conversation_header.view.*
 import kotlinx.android.synthetic.main.view_conversation_bottom.view.*
 import kotlinx.android.synthetic.main.view_empty.*
 import one.mixin.android.Constants.Account.PREF_NOTIFICATION_ON
-import one.mixin.android.Constants.INTERVAL_24_HOURS
+import one.mixin.android.Constants.INTERVAL_48_HOURS
 import one.mixin.android.R
+import one.mixin.android.extension.alertDialogBuilder
 import one.mixin.android.extension.animateHeight
 import one.mixin.android.extension.defaultSharedPreferences
 import one.mixin.android.extension.dpToPx
+import one.mixin.android.extension.inflate
 import one.mixin.android.extension.networkConnected
 import one.mixin.android.extension.notEmptyWithElse
 import one.mixin.android.extension.notNullWithElse
@@ -48,6 +48,7 @@ import one.mixin.android.extension.nowInUtc
 import one.mixin.android.extension.openNotificationSetting
 import one.mixin.android.extension.openPermissionSetting
 import one.mixin.android.extension.putLong
+import one.mixin.android.extension.renderConversation
 import one.mixin.android.extension.timeAgo
 import one.mixin.android.extension.toast
 import one.mixin.android.extension.vibrate
@@ -56,9 +57,13 @@ import one.mixin.android.job.MixinJobManager
 import one.mixin.android.ui.common.LinkFragment
 import one.mixin.android.ui.common.NavigationController
 import one.mixin.android.ui.common.UserBottomSheetDialogFragment
+import one.mixin.android.ui.common.recyclerview.NormalHolder
+import one.mixin.android.ui.common.recyclerview.PagedHeaderAdapter
 import one.mixin.android.ui.conversation.ConversationActivity
 import one.mixin.android.ui.qr.CaptureActivity
 import one.mixin.android.util.Session
+import one.mixin.android.util.markdown.MarkwonUtil
+import one.mixin.android.util.mention.MentionRenderCache
 import one.mixin.android.vo.AppButtonData
 import one.mixin.android.vo.AppCardData
 import one.mixin.android.vo.ConversationItem
@@ -86,11 +91,7 @@ class ConversationListFragment : LinkFragment() {
     }
 
     private val messageAdapter by lazy {
-        MessageAdapter({
-            requireContext().openNotificationSetting()
-        }, {
-            requireContext().defaultSharedPreferences.putLong(PREF_NOTIFICATION_ON, System.currentTimeMillis())
-        })
+        MessageAdapter()
     }
 
     private var distance = 0
@@ -118,6 +119,15 @@ class ConversationListFragment : LinkFragment() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
+        messageAdapter.headerView = message_rv.inflate(R.layout.item_list_conversation_header, false).apply {
+            header_close.setOnClickListener {
+                messageAdapter.setShowHeader(false, message_rv)
+                requireContext().defaultSharedPreferences.putLong(PREF_NOTIFICATION_ON, System.currentTimeMillis())
+            }
+            header_settings.setOnClickListener {
+                requireContext().openNotificationSetting()
+            }
+        }
         message_rv.adapter = messageAdapter
         message_rv.itemAnimator = null
         message_rv.setHasFixedSize(true)
@@ -193,34 +203,36 @@ class ConversationListFragment : LinkFragment() {
                     }
                 }
         }
-        messageAdapter.onItemClickListener = object : OnItemClickListener {
-            override fun longClick(conversation: ConversationItem): Boolean {
-                showBottomSheet(conversation)
+        messageAdapter.onItemListener = object : PagedHeaderAdapter.OnItemListener<ConversationItem> {
+            override fun onNormalLongClick(item: ConversationItem): Boolean {
+                showBottomSheet(item)
                 return true
             }
 
-            override fun click(position: Int, conversation: ConversationItem) {
-                if (conversation.isGroup() && (conversation.status == ConversationStatus.START.ordinal ||
-                        conversation.status == ConversationStatus.FAILURE.ordinal)
+            override fun onNormalItemClick(item: ConversationItem) {
+                if (item.isGroup() && (item.status == ConversationStatus.START.ordinal ||
+                        item.status == ConversationStatus.FAILURE.ordinal)
                 ) {
                     if (!requireContext().networkConnected()) {
                         context?.toast(R.string.error_network)
                         return
                     }
-                    doAsync { messagesViewModel.createGroupConversation(conversation.conversationId) }
+                    doAsync { messagesViewModel.createGroupConversation(item.conversationId) }
                 } else {
-                    ConversationActivity.show(requireContext(), conversationId = conversation.conversationId)
+                    ConversationActivity.show(requireContext(), conversationId = item.conversationId)
                 }
             }
         }
-        messagesViewModel.conversations.observe(viewLifecycleOwner, Observer { r ->
-            if (r == null || r.isEmpty()) {
+        messagesViewModel.observeConversations().observe(viewLifecycleOwner, Observer { pagedList ->
+            messageAdapter.submitList(pagedList)
+            if (pagedList == null || pagedList.isEmpty()) {
                 empty_view.visibility = VISIBLE
             } else {
                 empty_view.visibility = GONE
-                messageAdapter.setConversationList(r)
-                r.filter { it.isGroup() && (it.iconUrl() == null || !File(it.iconUrl()).exists()) }
-                    .forEach {
+                pagedList
+                    .filter { item: ConversationItem? ->
+                        item?.isGroup() == true && (item.iconUrl() == null || !File(item.iconUrl() ?: "").exists())
+                    }.forEach {
                         jobManager.addJobInBackground(GenerateAvatarJob(it.conversationId))
                     }
             }
@@ -267,7 +279,7 @@ class ConversationListFragment : LinkFragment() {
             bottomSheet.dismiss()
         }
         view.delete_tv.setOnClickListener {
-            AlertDialog.Builder(requireContext(), R.style.MixinAlertDialogTheme)
+            alertDialogBuilder()
                 .setMessage(getString(R.string.conversation_delete_tip))
                 .setNegativeButton(R.string.cancel) { dialog, _ ->
                     dialog.dismiss()
@@ -306,134 +318,48 @@ class ConversationListFragment : LinkFragment() {
     override fun onResume() {
         super.onResume()
         val notificationTime = requireContext().defaultSharedPreferences.getLong(PREF_NOTIFICATION_ON, 0)
-        if (System.currentTimeMillis() - notificationTime > INTERVAL_24_HOURS) {
-            messageAdapter.showHeader = !NotificationManagerCompat.from(requireContext()).areNotificationsEnabled()
+        if (System.currentTimeMillis() - notificationTime > INTERVAL_48_HOURS) {
+            messageAdapter.setShowHeader(!NotificationManagerCompat.from(requireContext()).areNotificationsEnabled(), message_rv)
         } else {
-            messageAdapter.showHeader = false
+            messageAdapter.setShowHeader(false, message_rv)
         }
     }
 
-    class MessageAdapter(val settingAction: () -> Unit, val closeAction: () -> Unit) :
-        RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+    class MessageAdapter : PagedHeaderAdapter<ConversationItem>(ConversationItem.DIFF_CALLBACK) {
 
-        var showHeader = false
-            set(value) {
-                if (field != value) {
-                    field = value
-                    notifyDataSetChanged()
-                }
-            }
-
-        var conversations: List<ConversationItem>? = null
-
-        var onItemClickListener: OnItemClickListener? = null
-
-        private fun getRealPosition(position: Int): Int {
-            return if (showHeader) {
-                position - 1
-            } else {
-                position
-            }
-        }
-
-        fun setConversationList(newConversations: List<ConversationItem>) {
-            if (conversations == null) {
-                conversations = newConversations
-                notifyItemRangeInserted(
-                    0, newConversations.size + getOffset()
+        override fun getNormalViewHolder(context: Context, parent: ViewGroup): NormalHolder =
+            MessageHolder(
+                LayoutInflater.from(parent.context).inflate(
+                    R.layout.item_list_conversation,
+                    parent,
+                    false
                 )
-            } else {
-                val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                    override fun getOldListSize(): Int {
-                        return conversations!!.size + getOffset()
-                    }
-
-                    override fun getNewListSize(): Int {
-                        return newConversations.size + getOffset()
-                    }
-
-                    override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                        if (showHeader && (newItemPosition == 0 || oldItemPosition == 0)) return false
-                        val old = conversations!![getRealPosition(oldItemPosition)]
-                        val newItem = newConversations[getRealPosition(newItemPosition)]
-                        return old.conversationId == newItem.conversationId
-                    }
-
-                    override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                        if (showHeader && (newItemPosition == 0 || oldItemPosition == 0)) return false
-                        val old = conversations!![getRealPosition(oldItemPosition)]
-                        val newItem = newConversations[getRealPosition(newItemPosition)]
-                        return old == newItem
-                    }
-                })
-                conversations = newConversations
-                diffResult.dispatchUpdatesTo(this)
-            }
-        }
+            )
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            if (getItemViewType(position) == 0) {
-                (holder as MessageHolder).bind(
-                    onItemClickListener,
-                    position,
-                    conversations!![getRealPosition(position)]
-                )
-            }
-        }
-
-        override fun getItemCount() = conversations.notNullWithElse({ it.size + getOffset() }, getOffset())
-
-        override fun getItemViewType(position: Int): Int {
-            return if (showHeader && position == 0) {
-                1
-            } else {
-                0
-            }
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            return if (viewType == 0) {
-                MessageHolder(
-                    LayoutInflater.from(parent.context).inflate(
-                        R.layout.item_list_conversation,
-                        parent,
-                        false
-                    )
-                )
-            } else {
-                HeaderHolder(
-                    LayoutInflater.from(parent.context).inflate(
-                        R.layout.item_list_conversation_header,
-                        parent,
-                        false
-                    )
-                ).apply {
-                    itemView.header_close.setOnClickListener {
-                        showHeader = false
-                        closeAction()
-                    }
-                    itemView.header_settings.setOnClickListener {
-                        settingAction()
-                    }
+            if (holder is MessageHolder) {
+                val pos = getPos(position)
+                getItem(pos)?.let {
+                    holder.bind(onItemListener, it)
                 }
             }
         }
-
-        private fun getOffset(): Int { return if (showHeader) { 1 } else { 0 } }
     }
 
-    class HeaderHolder constructor(containerView: View) : RecyclerView.ViewHolder(containerView)
-
-    class MessageHolder constructor(containerView: View) : RecyclerView.ViewHolder(containerView) {
+    class MessageHolder constructor(containerView: View) : NormalHolder(containerView) {
         var context: Context = itemView.context
         private fun getText(id: Int) = context.getText(id).toString()
 
-        fun bind(onItemClickListener: OnItemClickListener?, position: Int, conversationItem: ConversationItem) {
+        fun bind(
+            onItemClickListener: PagedHeaderAdapter.OnItemListener<ConversationItem>?,
+            conversationItem: ConversationItem
+        ) {
             val id = Session.getAccountId()
             conversationItem.getConversationName().let {
                 itemView.name_tv.text = it
             }
             itemView.group_name_tv.visibility = GONE
+            itemView.mention_flag.isVisible = conversationItem.mentionCount != null && conversationItem.mentionCount > 0
             when {
                 conversationItem.messageStatus == MessageStatus.FAILED.name -> {
                     conversationItem.content?.let {
@@ -446,7 +372,11 @@ class ConversationListFragment : LinkFragment() {
                     conversationItem.contentType == MessageCategory.PLAIN_TEXT.name -> {
                     conversationItem.content?.let {
                         setConversationName(conversationItem)
-                        itemView.msg_tv.text = it
+                        if (conversationItem.mentions != null) {
+                            itemView.msg_tv.renderConversation(it, MentionRenderCache.singleton.getMentionRenderContext(conversationItem.mentions) {})
+                        } else {
+                            itemView.msg_tv.text = it
+                        }
                     }
                     null
                 }
@@ -485,9 +415,9 @@ class ConversationListFragment : LinkFragment() {
                     AppCompatResources.getDrawable(itemView.context, R.drawable.ic_status_file)
                 }
                 conversationItem.contentType == MessageCategory.SIGNAL_POST.name ||
-                    conversationItem.contentType == MessageCategory.SIGNAL_POST.name -> {
+                    conversationItem.contentType == MessageCategory.PLAIN_POST.name -> {
                     setConversationName(conversationItem)
-                    itemView.msg_tv.setText(R.string.conversation_status_post)
+                    itemView.msg_tv.text = MarkwonUtil.parseContent(conversationItem.content)
                     AppCompatResources.getDrawable(itemView.context, R.drawable.ic_status_file)
                 }
                 conversationItem.contentType == MessageCategory.SIGNAL_AUDIO.name ||
@@ -671,9 +601,9 @@ class ConversationListFragment : LinkFragment() {
                 itemView.avatar_iv.setInfo(conversationItem.getConversationName(),
                     conversationItem.iconUrl(), conversationItem.ownerId)
             }
-            itemView.setOnClickListener { onItemClickListener?.click(position, conversationItem) }
+            itemView.setOnClickListener { onItemClickListener?.onNormalItemClick(conversationItem) }
             itemView.setOnLongClickListener {
-                onItemClickListener.notNullWithElse({ it.longClick(conversationItem) }, false)
+                onItemClickListener.notNullWithElse({ it.onNormalLongClick(conversationItem) }, false)
             }
         }
 
@@ -694,7 +624,7 @@ class ConversationListFragment : LinkFragment() {
             getString(R.string.contact_mute_1year))
         var duration = UserBottomSheetDialogFragment.MUTE_8_HOURS
         var whichItem = 0
-        AlertDialog.Builder(requireContext(), R.style.MixinAlertDialogTheme)
+        alertDialogBuilder()
             .setTitle(getString(R.string.contact_mute_title))
             .setNegativeButton(R.string.cancel) { dialog, _ ->
                 dialog.dismiss()
@@ -734,10 +664,5 @@ class ConversationListFragment : LinkFragment() {
             }
             context?.toast(getString(R.string.un_mute) + " ${conversationItem.name}")
         }
-    }
-
-    interface OnItemClickListener {
-        fun click(position: Int, conversation: ConversationItem)
-        fun longClick(conversation: ConversationItem): Boolean
     }
 }

@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import java.security.KeyPair
 import kotlinx.android.synthetic.main.fragment_verification_emergency.*
@@ -15,11 +14,12 @@ import one.mixin.android.R
 import one.mixin.android.api.handleMixinResponse
 import one.mixin.android.api.request.EmergencyPurpose
 import one.mixin.android.api.request.EmergencyRequest
-import one.mixin.android.crypto.Base64
 import one.mixin.android.crypto.CryptoPreference
 import one.mixin.android.crypto.SignalProtocol
 import one.mixin.android.crypto.generateRSAKeyPair
 import one.mixin.android.crypto.getPublicKey
+import one.mixin.android.extension.alertDialogBuilder
+import one.mixin.android.extension.base64Encode
 import one.mixin.android.extension.defaultSharedPreferences
 import one.mixin.android.extension.putInt
 import one.mixin.android.extension.withArgs
@@ -105,7 +105,7 @@ class VerificationEmergencyFragment : PinCodeFragment<EmergencyViewModel>() {
                     (it as? EmergencyContactFragment)?.setEmergencySet()
                 }
 
-                AlertDialog.Builder(requireContext(), R.style.MixinAlertDialogTheme)
+                alertDialogBuilder()
                     .setMessage(getString(
                         if (Session.hasEmergencyContact())
                             R.string.setting_emergency_change_success
@@ -151,7 +151,7 @@ class VerificationEmergencyFragment : PinCodeFragment<EmergencyViewModel>() {
 
     private fun buildLoginEmergencyRequest(sessionKey: KeyPair): EmergencyRequest {
         val registrationId = CryptoPreference.getLocalRegistrationId(requireContext())
-        val sessionSecret = Base64.encodeBytes(sessionKey.getPublicKey())
+        val sessionSecret = sessionKey.getPublicKey().base64Encode()
         return EmergencyRequest(
             user?.phone,
             user?.identityNumber ?: userIdentityNumber,

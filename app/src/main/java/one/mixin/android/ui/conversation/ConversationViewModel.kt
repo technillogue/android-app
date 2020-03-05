@@ -29,7 +29,7 @@ import one.mixin.android.MixinApplication
 import one.mixin.android.R
 import one.mixin.android.api.request.RelationshipRequest
 import one.mixin.android.api.request.StickerAddRequest
-import one.mixin.android.crypto.Base64
+import one.mixin.android.extension.base64Encode
 import one.mixin.android.extension.bitmap2String
 import one.mixin.android.extension.blurThumbnail
 import one.mixin.android.extension.copyFromInputStream
@@ -45,8 +45,8 @@ import one.mixin.android.extension.getMimeType
 import one.mixin.android.extension.getUriForFile
 import one.mixin.android.extension.isImageSupport
 import one.mixin.android.extension.isUUID
-import one.mixin.android.extension.notNullWithElse
 import one.mixin.android.extension.nowInUtc
+import one.mixin.android.extension.postOptimize
 import one.mixin.android.extension.putString
 import one.mixin.android.job.AttachmentDownloadJob
 import one.mixin.android.job.ConvertVideoJob
@@ -64,6 +64,7 @@ import one.mixin.android.repository.AssetRepository
 import one.mixin.android.repository.ConversationRepository
 import one.mixin.android.repository.UserRepository
 import one.mixin.android.util.Attachment
+import one.mixin.android.util.ControlledRunner
 import one.mixin.android.util.GsonHelper
 import one.mixin.android.util.SINGLE_DB_THREAD
 import one.mixin.android.util.Session
@@ -86,6 +87,7 @@ import one.mixin.android.vo.QuoteMessageItem
 import one.mixin.android.vo.Sticker
 import one.mixin.android.vo.User
 import one.mixin.android.vo.createAckJob
+import one.mixin.android.vo.createAppCardMessage
 import one.mixin.android.vo.createAttachmentMessage
 import one.mixin.android.vo.createAudioMessage
 import one.mixin.android.vo.createContactMessage
@@ -93,6 +95,7 @@ import one.mixin.android.vo.createConversation
 import one.mixin.android.vo.createLiveMessage
 import one.mixin.android.vo.createMediaMessage
 import one.mixin.android.vo.createMessage
+import one.mixin.android.vo.createPostMessage
 import one.mixin.android.vo.createRecallMessage
 import one.mixin.android.vo.createReplyTextMessage
 import one.mixin.android.vo.createStickerMessage
@@ -171,9 +174,16 @@ internal constructor(
     fun sendPostMessage(conversationId: String, sender: User, content: String, isPlain: Boolean) {
         val category =
             if (isPlain) MessageCategory.PLAIN_POST.name else MessageCategory.SIGNAL_POST.name
-        val message = createMessage(
+        val message = createPostMessage(
             UUID.randomUUID().toString(), conversationId,
-            sender.userId, category, content.trim(), nowInUtc(), MessageStatus.SENDING.name
+            sender.userId, category, content.trim(), content.postOptimize(), nowInUtc(), MessageStatus.SENDING.name
+        )
+        jobManager.addJobInBackground(SendMessageJob(message))
+    }
+
+    fun sendAppCardMessage(conversationId: String, sender: User, content: String) {
+        val message = createAppCardMessage(UUID.randomUUID().toString(), conversationId,
+            sender.userId, content, nowInUtc(), MessageStatus.SENDING.name
         )
         jobManager.addJobInBackground(SendMessageJob(message))
     }
@@ -234,8 +244,7 @@ internal constructor(
     ) {
         val category =
             if (isPlain) MessageCategory.PLAIN_STICKER.name else MessageCategory.SIGNAL_STICKER.name
-        val encoded =
-            Base64.encodeBytes(GsonHelper.customGson.toJson(transferStickerData).toByteArray())
+        val encoded = GsonHelper.customGson.toJson(transferStickerData).base64Encode()
         transferStickerData.stickerId?.let {
             val message = createStickerMessage(
                 UUID.randomUUID().toString(),
@@ -256,7 +265,7 @@ internal constructor(
     fun sendContactMessage(conversationId: String, sender: User, shareUserId: String, isPlain: Boolean, replyMessage: MessageItem? = null) {
         val category = if (isPlain) MessageCategory.PLAIN_CONTACT.name else MessageCategory.SIGNAL_CONTACT.name
         val transferContactData = ContactMessagePayload(shareUserId)
-        val encoded = Base64.encodeBytes(GsonHelper.customGson.toJson(transferContactData).toByteArray())
+        val encoded = GsonHelper.customGson.toJson(transferContactData).base64Encode()
         val message = createContactMessage(UUID.randomUUID().toString(), conversationId, sender.userId,
             category, encoded, shareUserId, MessageStatus.SENDING.name, nowInUtc(), replyMessage?.messageId, replyMessage?.toQuoteMessageItem())
         jobManager.addJobInBackground(SendMessageJob(message))
@@ -288,8 +297,7 @@ internal constructor(
     fun sendRecallMessage(conversationId: String, sender: User, list: List<MessageItem>) {
         list.forEach { messageItem ->
             val transferRecallData = RecallMessagePayload(messageItem.messageId)
-            val encoded =
-                Base64.encodeBytes(GsonHelper.customGson.toJson(transferRecallData).toByteArray())
+            val encoded = GsonHelper.customGson.toJson(transferRecallData).base64Encode()
             val message = createRecallMessage(
                 UUID.randomUUID().toString(), conversationId, sender.userId,
                 MessageCategory.MESSAGE_RECALL.name, encoded, MessageStatus.SENDING.name, nowInUtc()
@@ -312,7 +320,7 @@ internal constructor(
         val category =
             if (isPlain) MessageCategory.PLAIN_LIVE.name else MessageCategory.SIGNAL_LIVE.name
         val encoded =
-            Base64.encodeBytes(GsonHelper.customGson.toJson(transferLiveData).toByteArray())
+            GsonHelper.customGson.toJson(transferLiveData).base64Encode()
         val message = createLiveMessage(
             UUID.randomUUID().toString(),
             conversationId,
@@ -360,7 +368,9 @@ internal constructor(
         if (mimeType == null) {
             mimeType = getMimeType(uri)
             if (mimeType?.isImageSupport() != true) {
-                MixinApplication.get().toast(R.string.error_format)
+                viewModelScope.launch {
+                    MixinApplication.get().toast(R.string.error_format)
+                }
                 return null
             }
         }
@@ -498,6 +508,11 @@ internal constructor(
                         if (message.mediaUrl?.fileExists() != true) {
                             return@let 0
                         }
+                        val mediaDuration = try {
+                            message.mediaDuration?.toLong()
+                        } catch (e: Exception) {
+                            0L
+                        }
                         jobManager.addJobInBackground(
                             SendAttachmentMessageJob(
                                 createVideoMessage(
@@ -508,7 +523,7 @@ internal constructor(
                                     null,
                                     message.name,
                                     message.mediaUrl,
-                                    message.mediaDuration?.toLong(),
+                                    mediaDuration,
                                     message.mediaWidth,
                                     message.mediaHeight,
                                     message.thumbImage,
@@ -535,22 +550,9 @@ internal constructor(
                             }
                         jobManager.addJobInBackground(
                             SendAttachmentMessageJob(
-                                createAttachmentMessage(
-                                    UUID.randomUUID().toString(),
-                                    conversationId,
-                                    sender.userId,
-                                    category,
-                                    null,
-                                    message.name,
-                                    uri,
-                                    message.mediaMimeType!!,
-                                    message.mediaSize!!,
-                                    nowInUtc(),
-                                    null,
-                                    null,
-                                    MediaStatus.PENDING,
-                                    MessageStatus.SENDING.name
-                                )
+                                createAttachmentMessage(UUID.randomUUID().toString(), conversationId, sender.userId, category, null,
+                                    message.name, uri, message.mediaMimeType!!, message.mediaSize!!, nowInUtc(), null, null,
+                                    MediaStatus.PENDING, MessageStatus.SENDING.name)
                             )
                         )
                     }
@@ -604,9 +606,6 @@ internal constructor(
     fun getGroupParticipantsLiveData(conversationId: String) =
         conversationRepository.getGroupParticipantsLiveData(conversationId)
 
-    fun getGroupBotsLiveData(conversationId: String) =
-        conversationRepository.getGroupBotsLiveData(conversationId)
-
     fun initConversation(conversationId: String, recipient: User, sender: User) {
         val createdAt = nowInUtc()
         val conversation = createConversation(
@@ -624,10 +623,14 @@ internal constructor(
         Observable.just(userId).subscribeOn(Schedulers.io())
             .map { userRepository.getUserById(it) }.observeOn(AndroidSchedulers.mainThread())!!
 
+    suspend fun getAppAndCheckUser(userId: String) = userRepository.getAppAndCheckUser(userId)
+
     fun cancel(id: String) = viewModelScope.launch(Dispatchers.IO) {
-        jobManager.findJobById(id).notNullWithElse({ it.cancel() }, {
-            conversationRepository.updateMediaStatus(MediaStatus.CANCELED.name, id)
-        })
+        jobManager.cancelJobByMixinJobId(id) {
+            viewModelScope.launch {
+                conversationRepository.updateMediaStatus(MediaStatus.CANCELED.name, id)
+            }
+        }
     }
 
     fun retryUpload(id: String, onError: () -> Unit) {
@@ -701,7 +704,7 @@ internal constructor(
 
     fun findFriendsNotBot() = userRepository.findFriendsNotBot()
 
-    fun successConversationList() = conversationRepository.successConversationList()
+    suspend fun successConversationList() = conversationRepository.successConversationList()
 
     fun findContactUsers() = userRepository.findContactUsers()
 
@@ -712,8 +715,10 @@ internal constructor(
     fun deleteMessages(list: List<MessageItem>) {
         viewModelScope.launch(SINGLE_DB_THREAD) {
             list.forEach { item ->
-                conversationRepository.deleteMessage(item.messageId)
-                jobManager.cancelJobById(item.messageId)
+                conversationRepository.deleteMessage(
+                    item.messageId, item.mediaUrl
+                )
+                jobManager.cancelJobByMixinJobId(item.messageId)
                 notificationManager.cancel(item.userId.hashCode())
             }
         }
@@ -773,9 +778,9 @@ internal constructor(
         messages: List<ForwardMessage>?,
         isPlainMessage: Boolean
     ) {
-        messages?.let {
+        messages?.let { forwardMessages ->
             val sender = Session.getAccount()!!.toUser()
-            for (item in it) {
+            for (item in forwardMessages) {
                 if (item.id != null) {
                     sendFordMessage(conversationId, sender, item.id, isPlainMessage).subscribe({}, {
                         Timber.e("")
@@ -825,13 +830,22 @@ internal constructor(
                                 sendPostMessage(conversationId, sender, it, isPlainMessage)
                             }
                         }
+                        ForwardCategory.APP_CARD.name -> {
+                            item.content?.let {
+                                sendAppCardMessage(conversationId, sender, it)
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    fun sendForwardMessages(selectItem: List<Any>, messages: List<ForwardMessage>?) {
+    fun sendForwardMessages(
+        selectItem: List<Any>,
+        messages: List<ForwardMessage>?,
+        showSuccess: Boolean
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             var conversationId: String? = null
             for (item in selectItem) {
@@ -849,8 +863,10 @@ internal constructor(
                     sendForwardMessages(item.conversationId, messages, item.isBot())
                 }
 
-                withContext(Dispatchers.Main) {
-                    MixinApplication.get().toast(R.string.forward_success)
+                if (showSuccess) {
+                    withContext(Dispatchers.Main) {
+                        MixinApplication.get().toast(R.string.forward_success)
+                    }
                 }
                 findUnreadMessagesSync(conversationId!!)?.let { list ->
                     if (list.isNotEmpty()) {
@@ -1008,6 +1024,10 @@ internal constructor(
                         ForwardCategory.POST.name,
                         content = it.content
                     )
+                    it.category == MessageCategory.APP_CARD.name -> ForwardMessage(
+                        ForwardCategory.APP_CARD.name,
+                        content = it.content
+                    )
                     else -> ForwardMessage(ForwardCategory.TEXT.name)
                 }
             })
@@ -1016,4 +1036,26 @@ internal constructor(
     }
 
     suspend fun getAnnouncementByConversationId(conversationId: String) = conversationRepository.getAnnouncementByConversationId(conversationId)
+
+    private val searchControlledRunner = ControlledRunner<List<User>>()
+
+    suspend fun fuzzySearchUser(conversationId: String, keyword: String?): List<User> {
+        return withContext(Dispatchers.IO) {
+            searchControlledRunner.cancelPreviousThenRun {
+                if (keyword.isNullOrEmpty()) {
+                    userRepository.suspendGetGroupParticipants(conversationId)
+                } else {
+                    userRepository.fuzzySearchGroupUser(conversationId, keyword)
+                }
+            }
+        }
+    }
+
+    suspend fun findUserByIdentityNumberSuspend(identityNumber: String) = userRepository.findUserByIdentityNumberSuspend(identityNumber)
+
+    fun getUnreadMentionMessageByConversationId(conversationId: String) = conversationRepository.getUnreadMentionMessageByConversationId(conversationId)
+
+    suspend fun markMentionRead(messageId: String, conversationId: String) {
+        conversationRepository.markMentionRead(messageId, conversationId)
+    }
 }

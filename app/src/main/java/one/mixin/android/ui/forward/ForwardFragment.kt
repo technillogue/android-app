@@ -2,7 +2,6 @@ package one.mixin.android.ui.forward
 
 import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -11,9 +10,8 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
 import androidx.core.os.bundleOf
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.lifecycleScope
 import com.bugsnag.android.Bugsnag
 import com.tbruyelle.rxpermissions2.RxPermissions
 import com.timehop.stickyheadersrecyclerview.StickyRecyclerHeadersDecoration
@@ -23,10 +21,14 @@ import kotlinx.android.synthetic.main.fragment_forward.*
 import kotlinx.android.synthetic.main.view_title.view.*
 import kotlinx.coroutines.launch
 import one.mixin.android.R
+import one.mixin.android.RxBus
+import one.mixin.android.event.ForwardEvent
+import one.mixin.android.extension.hideKeyboard
 import one.mixin.android.extension.openPermissionSetting
 import one.mixin.android.ui.common.BaseFragment
 import one.mixin.android.ui.conversation.ConversationActivity
 import one.mixin.android.ui.conversation.ConversationViewModel
+import one.mixin.android.ui.forward.ForwardActivity.Companion.ARGS_FROM_CONVERSATION
 import one.mixin.android.ui.forward.ForwardActivity.Companion.ARGS_MESSAGES
 import one.mixin.android.ui.forward.ForwardActivity.Companion.ARGS_SHARE
 import one.mixin.android.ui.home.MainActivity
@@ -39,11 +41,16 @@ class ForwardFragment : BaseFragment() {
     companion object {
         const val TAG = "ForwardFragment"
 
-        fun newInstance(messages: ArrayList<ForwardMessage>, isShare: Boolean = false): ForwardFragment {
+        fun newInstance(
+            messages: ArrayList<ForwardMessage>,
+            isShare: Boolean = false,
+            fromConversation: Boolean = false
+        ): ForwardFragment {
             val fragment = ForwardFragment()
             val b = bundleOf(
                 ARGS_MESSAGES to messages,
-                ARGS_SHARE to isShare
+                ARGS_SHARE to isShare,
+                ARGS_FROM_CONVERSATION to fromConversation
             )
             fragment.arguments = b
             return fragment
@@ -60,15 +67,15 @@ class ForwardFragment : BaseFragment() {
     private val adapter by lazy {
         ForwardAdapter()
     }
-    var conversations: List<ConversationItem>? = null
-    var friends: List<User>? = null
 
     private val messages: ArrayList<ForwardMessage>? by lazy {
         arguments!!.getParcelableArrayList<ForwardMessage>(ARGS_MESSAGES)
     }
-
     private val isShare: Boolean by lazy {
         arguments!!.getBoolean(ARGS_SHARE)
+    }
+    private val fromConversation: Boolean by lazy {
+        arguments!!.getBoolean(ARGS_FROM_CONVERSATION)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? =
@@ -109,21 +116,15 @@ class ForwardFragment : BaseFragment() {
         if (isShare) {
             title_view.title_tv.text = getString(R.string.share)
         }
-        title_view.setOnClickListener { activity?.onBackPressed() }
+        title_view.setOnClickListener {
+            search_et?.hideKeyboard()
+            activity?.onBackPressed()
+        }
         forward_rv.adapter = adapter
         forward_rv.addItemDecoration(StickyRecyclerHeadersDecoration(adapter))
         forward_bn.setOnClickListener {
-            if (adapter.selectItem.size == 1) {
-                adapter.selectItem[0].let {
-                    if (it is User) {
-                        sendSingleMessage(null, it.userId)
-                    } else if (it is ConversationItem) {
-                        sendSingleMessage(it.conversationId, null)
-                    }
-                }
-            } else {
-                sendMessages()
-            }
+            search_et?.hideKeyboard()
+            sendMessages(adapter.selectItem.size == 1)
         }
         adapter.setForwardListener(object : ForwardAdapter.ForwardListener {
             override fun onConversationItemClick(item: ConversationItem) {
@@ -144,37 +145,32 @@ class ForwardFragment : BaseFragment() {
                 setForwardText()
             }
         })
-
-        chatViewModel.successConversationList().observe(viewLifecycleOwner, Observer {
-            it?.let { conversations ->
-                val set = ArraySet<String>()
-                this.conversations = conversations
-                adapter.sourceConversations = conversations
-                conversations.forEach { item ->
-                    if (item.isContact()) {
-                        set.add(item.ownerId)
-                    }
-                }
-
-                chatViewModel.viewModelScope.launch {
-                    val list = chatViewModel.getFriends()
-                    if (list.isNotEmpty()) {
-                        friends = list.filter { item ->
-                            !set.contains(item.userId)
-                        }
-                        adapter.sourceFriends = friends
-                    } else {
-                        friends = list
-                        adapter.sourceFriends = list
-                    }
-                    adapter.changeData()
-                }
-            }
-        })
         search_et.addTextChangedListener(mWatcher)
+
+        loadData()
     }
 
-    private fun sendMessages() {
+    private fun loadData() = lifecycleScope.launch {
+        val conversations = chatViewModel.successConversationList()
+        adapter.sourceConversations = conversations
+        val set = ArraySet<String>()
+        conversations.forEach { item ->
+            if (item.isContact()) {
+                set.add(item.ownerId)
+            }
+        }
+        val list = chatViewModel.getFriends()
+        if (list.isNotEmpty()) {
+            adapter.sourceFriends = list.filter { item ->
+                !set.contains(item.userId)
+            }
+        } else {
+            adapter.sourceFriends = list
+        }
+        adapter.changeData()
+    }
+
+    private fun sendMessages(single: Boolean) {
         if (messages?.find { it.type == ForwardCategory.VIDEO.name || it.type == ForwardCategory.IMAGE.name || it.type == ForwardCategory.DATA.name } != null) {
             RxPermissions(requireActivity())
                 .request(
@@ -183,9 +179,7 @@ class ForwardFragment : BaseFragment() {
                 .autoDispose(stopScope)
                 .subscribe({ granted ->
                     if (granted) {
-                        chatViewModel.sendForwardMessages(adapter.selectItem, messages)
-                        requireActivity().finish()
-                        sharePreOperation()
+                        sharePreOperation(single)
                     } else {
                         requireContext().openPermissionSetting()
                     }
@@ -193,41 +187,29 @@ class ForwardFragment : BaseFragment() {
                     Bugsnag.notify(it)
                 })
         } else {
-            chatViewModel.sendForwardMessages(adapter.selectItem, messages)
-            sharePreOperation()
+            sharePreOperation(single)
         }
     }
 
-    private fun sendSingleMessage(conversationId: String?, userId: String?) {
-        if (messages?.find { it.type == ForwardCategory.VIDEO.name || it.type == ForwardCategory.IMAGE.name || it.type == ForwardCategory.DATA.name } != null) {
-            RxPermissions(requireActivity())
-                .request(
-                    WRITE_EXTERNAL_STORAGE,
-                    READ_EXTERNAL_STORAGE)
-                .autoDispose(stopScope)
-                .subscribe({ granted ->
-                    if (granted) {
-                        sharePreOperation()
-                        ConversationActivity.show(requireContext(), conversationId, userId, messages = messages)
-                        activity?.finish()
-                    } else {
-                        requireContext().openPermissionSetting()
-                    }
-                }, {
-                    Bugsnag.notify(it)
-                })
-        } else {
-            sharePreOperation()
-            ConversationActivity.show(requireContext(), conversationId, userId, messages = messages)
+    private fun sharePreOperation(single: Boolean) {
+        chatViewModel.sendForwardMessages(adapter.selectItem, messages, !isShare && !fromConversation)
+        val forwardEvent = adapter.selectItem[0].let {
+             if (it is User) {
+                ForwardEvent(null, it.userId)
+            } else {
+                it as ConversationItem
+                ForwardEvent(it.conversationId, null)
+            }
         }
-    }
-
-    private fun sharePreOperation() {
         if (isShare) {
-            startActivity(Intent(context, MainActivity::class.java))
+            MainActivity.reopen(requireContext())
             activity?.finish()
+            ConversationActivity.show(requireContext(), forwardEvent.conversationId, forwardEvent.userId)
         } else {
             activity?.finish()
+            if (fromConversation && single) {
+                RxBus.publish(forwardEvent)
+            }
         }
     }
 
@@ -239,7 +221,7 @@ class ForwardFragment : BaseFragment() {
         }
 
         override fun afterTextChanged(s: Editable?) {
-            adapter.name = s
+            adapter.keyword = s
             adapter.changeData()
         }
     }

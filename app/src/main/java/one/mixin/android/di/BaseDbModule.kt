@@ -110,4 +110,12 @@ internal class BaseDbModule {
     @Singleton
     @Provides
     fun providesFavoriteAppDao(@DatabaseCategory(DatabaseCategoryEnum.BASE) db: MixinDatabase) = db.favoriteAppDao()
+
+    @Singleton
+    @Provides
+    fun providesMentionMessageDao(@DatabaseCategory(DatabaseCategoryEnum.BASE) db: MixinDatabase) = db.mentionMessageDao()
+
+    @Singleton
+    @Provides
+    fun providesMessageFts4Dao(@DatabaseCategory(DatabaseCategoryEnum.BASE) db: MixinDatabase) = db.messageFts4Dao()
 }

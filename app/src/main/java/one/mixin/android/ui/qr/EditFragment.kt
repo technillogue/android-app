@@ -135,10 +135,10 @@ class EditFragment : CaptureVisionFragment() {
         send_fl.setOnClickListener {
             if (isVideo) {
                 ForwardActivity.show(requireContext(), arrayListOf(ForwardMessage(
-                    ForwardCategory.VIDEO.name, mediaUrl = path)), true)
+                    ForwardCategory.VIDEO.name, mediaUrl = path)), isShare = true)
             } else {
                 ForwardActivity.show(requireContext(), arrayListOf(ForwardMessage(
-                    ForwardCategory.IMAGE.name, mediaUrl = path)), true)
+                    ForwardCategory.IMAGE.name, mediaUrl = path)), isShare = true)
             }
         }
         if (isVideo) {
@@ -202,7 +202,7 @@ class EditFragment : CaptureVisionFragment() {
             File(path).copy(outFile)
         }
         requireContext().sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outFile)))
-        requireContext().toast(R.string.save_success)
+        requireContext().toast(getString(R.string.save_to, outFile.absolutePath))
     }
 
     private val videoListener = object : MixinPlayer.VideoPlayerListenerWrapper() {

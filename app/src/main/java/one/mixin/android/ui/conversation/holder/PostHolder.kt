@@ -8,10 +8,11 @@ import androidx.core.widget.TextViewCompat
 import io.noties.markwon.Markwon
 import kotlinx.android.synthetic.main.item_chat_action.view.chat_name
 import kotlinx.android.synthetic.main.item_chat_post.view.*
-import one.mixin.android.MixinApplication
 import one.mixin.android.R
-import one.mixin.android.extension.dpToPx
+import one.mixin.android.extension.dp
 import one.mixin.android.extension.maxItemWidth
+import one.mixin.android.extension.postLengthOptimize
+import one.mixin.android.extension.postOptimize
 import one.mixin.android.extension.round
 import one.mixin.android.extension.timeAgoClock
 import one.mixin.android.ui.conversation.adapter.ConversationAdapter
@@ -23,40 +24,28 @@ class PostHolder constructor(containerView: View) : BaseViewHolder(containerView
     init {
         itemView.chat_tv.layoutParams.width = itemView.context.maxItemWidth()
         itemView.chat_tv.maxHeight = itemView.context.maxItemWidth() * 10 / 16
-        itemView.chat_tv.round(dp3)
-    }
-
-    private val dp6 by lazy {
-        MixinApplication.appContext.dpToPx(6f)
-    }
-
-    private val dp1 by lazy {
-        MixinApplication.appContext.dpToPx(1f)
+        itemView.chat_tv.round(3.dp)
     }
 
     override fun chatLayout(isMe: Boolean, isLast: Boolean, isBlink: Boolean) {
         super.chatLayout(isMe, isLast, isBlink)
         if (isMe) {
-            if (isLast) {
-                itemView.chat_time.setBackgroundResource(R.drawable.chat_bubble_shadow_last)
-            } else {
-                itemView.chat_time.setBackgroundResource(R.drawable.chat_bubble_shadow)
-            }
             (itemView.chat_layout.layoutParams as ConstraintLayout.LayoutParams).horizontalBias = 1f
+            (itemView.chat_time.layoutParams as ViewGroup.MarginLayoutParams).marginEnd = 12.dp
+            (itemView.chat_post.layoutParams as ViewGroup.MarginLayoutParams).marginEnd = 12.dp
+            (itemView.chat_tv.layoutParams as ViewGroup.MarginLayoutParams).apply {
+                marginStart = 8.dp
+                marginEnd = 14.dp
+            }
         } else {
-            if (isLast) {
-                itemView.chat_time.setBackgroundResource(R.drawable.chat_bubble_shadow)
-            } else {
-                itemView.chat_time.setBackgroundResource(R.drawable.chat_bubble_shadow)
-            }
             (itemView.chat_layout.layoutParams as ConstraintLayout.LayoutParams).horizontalBias = 0f
-        }
-        (itemView.chat_time.layoutParams as ViewGroup.MarginLayoutParams).marginEnd =
-            if (isMe && !isLast) {
-                dp6
-            } else {
-                dp1
+            (itemView.chat_time.layoutParams as ViewGroup.MarginLayoutParams).marginEnd = 6.dp
+            (itemView.chat_post.layoutParams as ViewGroup.MarginLayoutParams).marginEnd = 6.dp
+            (itemView.chat_tv.layoutParams as ViewGroup.MarginLayoutParams).apply {
+                marginStart = 14.dp
+                marginEnd = 8.dp
             }
+        }
         val lp = (itemView.chat_layout.layoutParams as ConstraintLayout.LayoutParams)
         if (isMe) {
             lp.horizontalBias = 1f
@@ -128,12 +117,17 @@ class PostHolder constructor(containerView: View) : BaseViewHolder(containerView
             }
         }
 
-        if (!messageItem.thumbImage.isNullOrEmpty()) {
-            miniMarkwon.setMarkdown(itemView.chat_tv, messageItem.thumbImage)
-        } else if (!messageItem.content.isNullOrEmpty()) {
-            miniMarkwon.setMarkdown(itemView.chat_tv, messageItem.content.split("\n").take(20).joinToString("\n"))
-        } else {
-            itemView.chat_tv.text = null
+        if (itemView.chat_tv.tag != messageItem.content.hashCode()) {
+            if (!messageItem.thumbImage.isNullOrEmpty()) {
+                miniMarkwon.setMarkdown(itemView.chat_tv, messageItem.thumbImage.postLengthOptimize())
+                itemView.chat_tv.tag = messageItem.content.hashCode()
+            } else if (!messageItem.content.isNullOrEmpty()) {
+                miniMarkwon.setMarkdown(itemView.chat_tv, messageItem.content.postOptimize())
+                itemView.chat_tv.tag = messageItem.content.hashCode()
+            } else {
+                itemView.chat_tv.text = null
+                itemView.chat_tv.tag = null
+            }
         }
 
         itemView.setOnLongClickListener {
@@ -175,8 +169,8 @@ class PostHolder constructor(containerView: View) : BaseViewHolder(containerView
         }
         itemView.chat_time.timeAgoClock(messageItem.createdAt)
         setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), true) { statusIcon, secretIcon ->
-            statusIcon?.setBounds(0, 0, dp12, dp12)
-            secretIcon?.setBounds(0, 0, dp8, dp8)
+            statusIcon?.setBounds(0, 0, 12.dp, 12.dp)
+            secretIcon?.setBounds(0, 0, 8.dp, 8.dp)
             TextViewCompat.setCompoundDrawablesRelative(itemView.chat_time, secretIcon, null, statusIcon, null)
         }
         chatLayout(isMe, isLast)

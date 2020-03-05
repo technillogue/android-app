@@ -1,6 +1,6 @@
 def versionMajor = 0
-def versionMinor = 19
-def versionPatch = 4
+def versionMinor = 21
+def versionPatch = 3
 def versionBuild = 0
 
 apply plugin: 'com.android.application'
@@ -45,6 +45,7 @@ android {
 
         kotlinOptions {
             jvmTarget = '1.8'
+            freeCompilerArgs += ['-Xuse-experimental=kotlin.contracts.ExperimentalContracts']
         }
 
         vectorDrawables.useSupportLibrary = true
@@ -116,7 +117,7 @@ android {
     }
 
     configurations.all {
-        resolutionStrategy.force "com.android.tools.build.jetifier:jetifier-core:1.0.0-beta08"
+        resolutionStrategy.force "com.android.tools.build.jetifier:jetifier-core:1.0.0-beta09"
     }
 }
 
@@ -140,7 +141,7 @@ dependencies {
     implementation "androidx.camera:camera-camera2:${cameraxVersion}"
     implementation "androidx.camera:camera-view:${cameraxviewVersion}"
     implementation "androidx.camera:camera-extensions:${cameraxviewVersion}"
-    implementation "androidx.camera:camera-lifecycle:${cameraxlifecycleVersion}"
+    implementation "androidx.camera:camera-lifecycle:${cameraxVersion}"
 
     implementation "androidx.work:work-runtime-ktx:${workManagerVersion}"
     implementation "androidx.navigation:navigation-fragment-ktx:${navigationVersion}"
@@ -200,7 +201,7 @@ dependencies {
     }
 
     implementation "com.google.code.gson:gson:${gsonVersion}"
-    implementation "com.google.firebase:firebase-core:${firebaseVersion}"
+    implementation "com.google.firebase:firebase-analytics:${firebaseVersion}"
     implementation "com.google.firebase:firebase-messaging:${firebaseMessageVersion}"
     implementation "com.google.firebase:firebase-dynamic-links:${firebaseDylinkVersion}"
     implementation "com.google.firebase:firebase-ml-vision:${firebaseMLVersion}"
@@ -232,7 +233,7 @@ dependencies {
     implementation("com.facebook.stetho:stetho-okhttp3:${stethoVersion}") {
         exclude group: 'com.squareup.okhttp3', module: 'okhttp'
     }
-    implementation "com.github.jorgecastilloprz:fabprogresscircle:${fabprogresscircleVersion}"
+    implementation "com.github.tougee:FABProgressCircle:${fabprogresscircleVersion}"
     implementation "com.github.tougee:country-picker-android:${countryPickerVersion}"
     implementation "com.dmitrymalkovich.android:progress-fab:${fabVersion}"
     implementation "com.googlecode.libphonenumber:libphonenumber:${libphonenumberVersion}"
@@ -269,10 +270,13 @@ dependencies {
     implementation "io.noties.markwon:recycler:${markwonVersion}"
     implementation "io.noties.markwon:recycler-table:${markwonVersion}"
     implementation "io.noties.markwon:ext-strikethrough:${markwonVersion}"
+    implementation "io.noties.markwon:html:${markwonVersion}"
     implementation "io.noties:prism4j:${prism4jVersion}"
     implementation "io.noties.markwon:syntax-highlight:${markwonVersion}"
+    implementation "io.noties.markwon:ext-tasklist:${markwonVersion}"
     implementation "org.webrtc:google-webrtc:${webrtcVersion}"
     implementation "com.github.SandroMachado:BitcoinPaymentURI:${bitcoinPaymentURI}"
+    implementation "com.caverock:androidsvg-aar:${svgVersion}"
 
 }
 

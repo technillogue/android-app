@@ -13,6 +13,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
+        android:layout_marginTop="1.5dp"
         android:layout_marginBottom="1.5dp"
         android:ellipsize="end"
         android:gravity="start|center_vertical"
@@ -34,7 +35,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/chat_name"
-        app:layout_goneMarginTop="0dp">
+        app:layout_goneMarginTop="1.5dp">
 
         <one.mixin.android.widget.NonScrollingTextView
             android:id="@+id/chat_tv"
@@ -42,7 +43,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="start"
             android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             android:minHeight="32dp"
@@ -56,7 +57,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:layout_marginBottom="1.5dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_bubble_shadow"
             android:drawablePadding="3dp"
             android:fontFamily="@font/sf_pro_light"
             android:gravity="end|bottom"
@@ -64,21 +66,14 @@
             android:textSize="@dimen/chat_date_size"
             tools:text="7:48AM" />
 
-        <TextView
+        <ImageView
             android:id="@+id/chat_post"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:layout_marginTop="6dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/chat_post_shadow"
-            android:paddingStart="5dp"
-            android:paddingTop="1.5dp"
-            android:paddingEnd="5dp"
-            android:paddingBottom="1.5dp"
-            android:text="@string/post_tag"
-            android:textColor="@color/white"
-            android:textSize="10sp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/ic_post"
             tools:ignore="HardcodedText" />
     </one.mixin.android.widget.ShadowLayout>
 

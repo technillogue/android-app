@@ -1,14 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.DarkActionBar">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">?attr/color_primary</item>
         <item name="colorPrimaryDark">?attr/color_primary_dark</item>
         <item name="colorAccent">?attr/color_accent</item>
+        <item name="colorSurface">?attr/color_primary</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:fontFamily">@font/sf_pro_regular</item>
-        <item name="android:windowBackground">@color/colorPrimary</item>
+        <item name="android:windowBackground">?attr/colorPrimary</item>
         <item name="android:windowContentTransitions">true</item>
         <item name="android:textColorHighlight">@color/blue_highlight</item>
         <item name="android:textViewStyle">@style/NoneHFTextViewStyle</item>
@@ -51,6 +52,7 @@
         <item name="icon_emergency">@drawable/ic_emergency_avatar</item>
         <item name="icon_emergency_contact">@drawable/ic_emergency_contact</item>
 
+        <item name="code_border">@color/codeBorder</item>
     </style>
 
 
@@ -103,9 +105,10 @@
     <style name="MixinAlertDialogTheme" parent="Theme.AppCompat.DayNight.Dialog.Alert">
         <item name="colorAccent">@color/colorDarkBlue</item>
         <item name="android:textColorPrimary">?attr/text_primary</item>
-        <item name="android:background">?attr/bg_white</item>
         <item name="buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
         <item name="textColorAlertDialogListItem">?attr/text_primary</item>
+        <item name="android:colorControlNormal">?attr/text_primary</item>
+        <item name="android:background">?attr/bg_white</item>
     </style>
 
     <style name="PositiveButtonStyle" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
@@ -147,7 +150,7 @@
 
     <style name="AppTheme.GrayProgress">
         <item name="android:indeterminateTint">?attr/icon_gray</item>
-        <item name="android:indeterminate">true</item>
+        <item name="android:indeterminate">false</item>
         <item name="android:indeterminateTintMode">src_atop</item>
     </style>
 

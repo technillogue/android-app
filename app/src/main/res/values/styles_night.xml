@@ -2,7 +2,6 @@
 <resources>
 
     <style name="AppTheme.Night" parent="AppTheme">
-        <item name="android:windowBackground">@color/colorPrimaryNight</item>
         <item name="color_primary">@color/colorPrimaryDarkNight</item>
         <item name="color_primary_dark">@color/colorPrimaryNight</item>
         <item name="color_accent">@color/colorAccentNight</item>
@@ -41,6 +40,7 @@
         <item name="icon_emergency_contact">@drawable/ic_emergency_contact_night</item>
 
         <item name="flag_night">true</item>
+        <item name="code_border">@color/codeBorderNight</item>
     </style>
 
     <style name="AppTheme.Night.NoActionBar" parent="AppTheme.Night">
@@ -63,7 +63,6 @@
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:navigationBarColor">?attr/text_primary</item>
     </style>
-
 
     <style name="AppTheme.Night.Call" parent="AppTheme.Night.NoActionBar">
         <item name="android:windowBackground">@color/call_gray</item>

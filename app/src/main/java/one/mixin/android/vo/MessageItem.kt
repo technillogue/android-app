@@ -88,7 +88,9 @@ data class MessageItem(
     val mediaWaveform: ByteArray? = null,
     val quoteId: String? = null,
     val quoteContent: String? = null,
-    val groupName: String? = null
+    val groupName: String? = null,
+    val mentions: String? = null,
+    val mentionRead: Boolean? = null
 ) : Parcelable {
     companion object {
         val DIFF_CALLBACK = object : DiffUtil.ItemCallback<MessageItem>() {
@@ -117,8 +119,7 @@ fun MessageItem.isMedia(): Boolean = this.type == MessageCategory.SIGNAL_IMAGE.n
     this.type == MessageCategory.SIGNAL_VIDEO.name ||
     this.type == MessageCategory.PLAIN_VIDEO.name
 
-fun MessageItem.canNotForward() = this.type == MessageCategory.APP_CARD.name ||
-    this.type == MessageCategory.APP_BUTTON_GROUP.name ||
+fun MessageItem.canNotForward() = this.type == MessageCategory.APP_BUTTON_GROUP.name ||
     this.type == MessageCategory.SYSTEM_ACCOUNT_SNAPSHOT.name ||
     this.type == MessageCategory.SYSTEM_CONVERSATION.name ||
     (!mediaDownloaded(this.mediaStatus) && this.isMedia()) ||
@@ -230,7 +231,7 @@ fun MessageItem.saveToLocal(context: Context) {
     }
     outFile.copyFromInputStream(FileInputStream(file))
     context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outFile)))
-    MixinApplication.appContext.toast(R.string.save_success)
+    MixinApplication.appContext.toast(MixinApplication.appContext.getString(R.string.save_to, outFile.absolutePath))
 }
 
 fun MessageItem.loadVideoOrLive(actionAfterLoad: (() -> Unit)? = null) {

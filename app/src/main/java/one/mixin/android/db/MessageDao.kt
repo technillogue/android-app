@@ -4,6 +4,7 @@ import androidx.paging.DataSource
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.RoomWarnings
+import one.mixin.android.util.QueryMessage
 import one.mixin.android.util.Session
 import one.mixin.android.vo.HyperlinkItem
 import one.mixin.android.vo.MediaMessageMinimal
@@ -29,7 +30,7 @@ interface MessageDao : BaseDao<Message> {
                 a.icon_url AS assetIcon, st.asset_url AS assetUrl, st.asset_width AS assetWidth, st.asset_height AS assetHeight, st.sticker_id AS stickerId,
                 st.name AS assetName, st.asset_type AS assetType, h.site_name AS siteName, h.site_title AS siteTitle, h.site_description AS siteDescription,
                 h.site_image AS siteImage, m.shared_user_id AS sharedUserId, su.full_name AS sharedUserFullName, su.identity_number AS sharedUserIdentityNumber,
-                su.avatar_url AS sharedUserAvatarUrl, su.is_verified AS sharedUserIsVerified, su.app_id AS sharedUserAppId,
+                su.avatar_url AS sharedUserAvatarUrl, su.is_verified AS sharedUserIsVerified, su.app_id AS sharedUserAppId, mm.mentions AS mentions, mm.has_read as mentionRead, 
                 c.name AS groupName
                 FROM messages m
                 INNER JOIN users u ON m.user_id = u.user_id
@@ -40,6 +41,7 @@ interface MessageDao : BaseDao<Message> {
                 LEFT JOIN hyperlinks h ON m.hyperlink = h.hyperlink
                 LEFT JOIN users su ON m.shared_user_id = su.user_id
                 LEFT JOIN conversations c ON m.conversation_id = c.conversation_id
+                LEFT JOIN message_mentions mm ON m.id = mm.message_id
                 WHERE m.conversation_id = :conversationId 
             """
     }
@@ -61,10 +63,10 @@ interface MessageDao : BaseDao<Message> {
         m.content AS content, m.created_at AS createdAt, m.status AS status, m.media_status AS mediaStatus,
         m.media_width AS mediaWidth, m.media_height AS mediaHeight, m.thumb_image AS thumbImage, m.thumb_url AS thumbUrl,
         m.media_url AS mediaUrl, m.media_mime_type AS mediaMimeType, m.media_duration AS mediaDuration
-        FROM messages m INNER JOIN users u ON m.user_id = u.user_id WHERE m.conversation_id = :conversationId
-        AND (m.category = 'SIGNAL_IMAGE' OR m.category = 'PLAIN_IMAGE' OR m.category = 'SIGNAL_VIDEO' OR m.category = 'PLAIN_VIDEO'
-        OR m.category = 'SIGNAL_LIVE' OR m.category = 'PLAIN_LIVE') 
-        ORDER BY m.created_at ASC
+        FROM messages m INNER JOIN users u ON m.user_id = u.user_id 
+        WHERE m.conversation_id = :conversationId
+        AND m.category IN ('SIGNAL_IMAGE','PLAIN_IMAGE', 'SIGNAL_VIDEO', 'PLAIN_VIDEO', 'SIGNAL_LIVE', 'PLAIN_LIVE') 
+        ORDER BY m.created_at ASC, m.rowid ASC
         """
     )
     fun getMediaMessages(conversationId: String): DataSource.Factory<Int, MessageItem>
@@ -78,18 +80,17 @@ interface MessageDao : BaseDao<Message> {
         m.media_url AS mediaUrl, m.media_mime_type AS mediaMimeType, m.media_duration AS mediaDuration
         FROM messages m 
         INNER JOIN users u ON m.user_id = u.user_id 
-        WHERE m.conversation_id = :conversationId
-        AND m.id = :messageId
+        WHERE m.id = :messageId AND m.conversation_id = :conversationId
         """
     )
     suspend fun getMediaMessage(conversationId: String, messageId: String): MessageItem
 
     @Query(
-        """SELECT count(*) FROM messages WHERE conversation_id = :conversationId
-        AND rowid < (SELECT rowid FROM messages WHERE id = :messageId)
-        AND (category = 'SIGNAL_IMAGE' OR category = 'PLAIN_IMAGE' OR category = 'SIGNAL_VIDEO' OR category = 'PLAIN_VIDEO'
-        OR category = 'SIGNAL_LIVE' OR category = 'PLAIN_LIVE')
-        ORDER BY created_at ASC
+        """
+            SELECT count(*) FROM messages WHERE conversation_id = :conversationId
+            AND created_at < (SELECT created_at FROM messages WHERE id = :messageId)
+            AND category IN ('SIGNAL_IMAGE','PLAIN_IMAGE', 'SIGNAL_VIDEO', 'PLAIN_VIDEO', 'SIGNAL_LIVE', 'PLAIN_LIVE') 
+            ORDER BY created_at ASC, rowid ASC
         """
     )
     suspend fun indexMediaMessages(conversationId: String, messageId: String): Int
@@ -104,17 +105,17 @@ interface MessageDao : BaseDao<Message> {
         m.media_url AS mediaUrl, m.media_mime_type AS mediaMimeType, m.media_duration AS mediaDuration
         FROM messages m INNER JOIN users u ON m.user_id = u.user_id
         WHERE m.conversation_id = :conversationId
-        AND (m.category = 'SIGNAL_IMAGE' OR m.category = 'PLAIN_IMAGE' OR m.category = 'SIGNAL_VIDEO' OR m.category = 'PLAIN_VIDEO')
-        ORDER BY m.created_at DESC
+        AND m.category IN ('SIGNAL_IMAGE', 'PLAIN_IMAGE', 'SIGNAL_VIDEO', 'PLAIN_VIDEO')
+        ORDER BY m.created_at DESC, m.rowid ASC
         """
     )
     fun getMediaMessagesExcludeLive(conversationId: String): DataSource.Factory<Int, MessageItem>
 
     @Query(
         """SELECT count(*) FROM messages WHERE conversation_id = :conversationId 
-        AND rowid > (SELECT rowid FROM messages WHERE id = :messageId)
-        AND (category = 'SIGNAL_IMAGE' OR category = 'PLAIN_IMAGE' OR category = 'SIGNAL_VIDEO' OR category = 'PLAIN_VIDEO')
-        ORDER BY created_at DESC
+        AND created_at > (SELECT created_at FROM messages WHERE id = :messageId)
+        AND category IN ('SIGNAL_IMAGE', 'PLAIN_IMAGE', 'SIGNAL_VIDEO', 'PLAIN_VIDEO')
+        ORDER BY created_at DESC, rowid ASC
         """
     )
     suspend fun indexMediaMessagesExcludeLive(conversationId: String, messageId: String): Int
@@ -129,7 +130,7 @@ interface MessageDao : BaseDao<Message> {
         m.media_url AS mediaUrl, m.media_mime_type AS mediaMimeType, m.media_duration AS mediaDuration,  m.media_waveform AS mediaWaveform
         FROM messages m INNER JOIN users u ON m.user_id = u.user_id 
         WHERE m.conversation_id = :conversationId
-        AND (m.category = 'SIGNAL_AUDIO' OR m.category = 'PLAIN_AUDIO')
+        AND m.category IN ('SIGNAL_AUDIO', 'PLAIN_AUDIO')
         ORDER BY m.created_at DESC
         """
     )
@@ -141,7 +142,7 @@ interface MessageDao : BaseDao<Message> {
             h.site_name AS siteName, h.site_title AS siteTitle, m.created_at AS createdAt
             FROM hyperlinks h INNER JOIN messages m ON h.hyperlink = m.hyperlink
             WHERE m.conversation_id = :conversationId
-            AND (m.category = 'SIGNAL_TEXT' OR m.category = 'PLAIN_TEXT')
+            AND m.category IN ('SIGNAL_TEXT', 'PLAIN_TEXT')
             ORDER BY m.created_at DESC
         """
     )
@@ -156,7 +157,7 @@ interface MessageDao : BaseDao<Message> {
         m.media_url AS mediaUrl, m.media_mime_type AS mediaMimeType, m.name AS mediaName, m.media_size AS mediaSize
         FROM messages m INNER JOIN users u ON m.user_id = u.user_id 
         WHERE m.conversation_id = :conversationId
-        AND (m.category = 'SIGNAL_DATA' OR m.category = 'PLAIN_DATA')
+        AND m.category IN ('SIGNAL_DATA', 'PLAIN_DATA')
         ORDER BY m.created_at DESC
         """
     )
@@ -172,11 +173,12 @@ interface MessageDao : BaseDao<Message> {
             "m.quote_message_id as quoteId, m.quote_content as quoteContent, " +
             "st.asset_url AS assetUrl, st.asset_width AS assetWidth, st.asset_height AS assetHeight, st.sticker_id AS stickerId, " +
             "st.name AS assetName, st.asset_type AS assetType, m.shared_user_id AS sharedUserId, su.full_name AS sharedUserFullName, su.identity_number AS sharedUserIdentityNumber, " +
-            "su.avatar_url AS sharedUserAvatarUrl, su.is_verified AS sharedUserIsVerified, su.app_id AS sharedUserAppId " +
+            "su.avatar_url AS sharedUserAvatarUrl, su.is_verified AS sharedUserIsVerified, su.app_id AS sharedUserAppId, mm.mentions AS mentions " +
             "FROM messages m " +
             "INNER JOIN users u ON m.user_id = u.user_id " +
             "LEFT JOIN stickers st ON st.sticker_id = m.sticker_id " +
             "LEFT JOIN users su ON m.shared_user_id = su.user_id " +
+            "LEFT JOIN message_mentions mm ON m.id = mm.message_id " +
             "WHERE m.conversation_id = :conversationId AND m.id = :messageId AND m.status != 'FAILED'"
     )
     fun findMessageItemById(conversationId: String, messageId: String): QuoteMessageItem?
@@ -194,12 +196,13 @@ interface MessageDao : BaseDao<Message> {
             u.user_id AS userId, u.avatar_url AS userAvatarUrl, u.full_name AS userFullName
             FROM messages m INNER JOIN users u ON c.owner_id = u.user_id
             INNER JOIN conversations c ON c.conversation_id = m.conversation_id
-            WHERE m.rowid in (SELECT rowid FROM messages_fts WHERE messages_fts MATCH :query) AND m.status != 'FAILED' 
+            WHERE m.id in (SELECT message_id FROM messages_fts4 WHERE messages_fts4 MATCH :query) 
             AND m.category IN('SIGNAL_TEXT', 'PLAIN_TEXT', 'SIGNAL_DATA', 'PLAIN_DATA', 'SIGNAL_POST', 'PLAIN_POST') 
+            AND m.status != 'FAILED'
             GROUP BY m.conversation_id
             ORDER BY m.created_at DESC
             LIMIT :limit
-            """
+        """
     )
     suspend fun fuzzySearchMessage(query: String, limit: Int): List<SearchMessageItem>
 
@@ -208,11 +211,12 @@ interface MessageDao : BaseDao<Message> {
             SELECT m.id AS messageId, u.user_id AS userId, u.avatar_url AS userAvatarUrl, u.full_name AS userFullName,
             m.category AS type, m.content AS content, m.created_at AS createdAt, m.name AS mediaName 
             FROM messages m INNER JOIN users u ON m.user_id = u.user_id 
-            WHERE m.rowid in (SELECT rowid FROM messages_fts WHERE messages_fts MATCH :query) AND m.status != 'FAILED' 
+            WHERE m.id in (SELECT message_id FROM messages_fts4 WHERE messages_fts4 MATCH :query) 
             AND m.category IN ('SIGNAL_TEXT', 'PLAIN_TEXT', 'SIGNAL_DATA', 'PLAIN_DATA', 'SIGNAL_POST', 'PLAIN_POST') 
             AND m.conversation_id = :conversationId
+            AND m.status != 'FAILED'
             ORDER BY m.created_at DESC
-            """
+        """
     )
     fun fuzzySearchMessageByConversationId(
         query: String,
@@ -225,8 +229,14 @@ interface MessageDao : BaseDao<Message> {
     @Query("DELETE FROM messages WHERE conversation_id = :conversationId")
     suspend fun deleteMessageByConversationId(conversationId: String)
 
+    @Query("SELECT m.media_url FROM messages m WHERE m.conversation_id = :conversationId AND m.media_url IS NOT NULL")
+    suspend fun findAllMediaPathByConversationId(conversationId: String): List<String>
+
     @Query("UPDATE messages SET status = :status WHERE id = :id")
     fun updateMessageStatus(status: String, id: String)
+
+    @Query("UPDATE messages SET status = 'READ' WHERE id IN (:messages) AND status != 'FAILED'")
+    fun markMessageRead(messages: List<String>)
 
     @Query("UPDATE messages SET status = 'SENT' WHERE id = :id AND status = 'FAILED'")
     fun recallFailedMessage(id: String)
@@ -293,9 +303,10 @@ interface MessageDao : BaseDao<Message> {
     @Query("UPDATE messages SET shared_user_id = :sharedUserId, status = :status WHERE id = :messageId AND category != 'MESSAGE_RECALL'")
     fun updateContactMessage(sharedUserId: String, status: String, messageId: String)
 
-    @Query(
-        "UPDATE messages SET media_width = :width, media_height = :height, media_url=:url, thumb_url = :thumbUrl, status = :status " +
-            "WHERE id = :messageId AND category != 'SIGNAL_LIVE'"
+    @Query("""
+        UPDATE messages SET media_width = :width, media_height = :height, media_url=:url, thumb_url = :thumbUrl, status = :status 
+        WHERE id = :messageId AND category != 'SIGNAL_LIVE'
+        """
     )
     fun updateLiveMessage(
         width: Int,
@@ -328,10 +339,14 @@ interface MessageDao : BaseDao<Message> {
     @Query("SELECT id, conversation_id, user_id, status, created_at FROM messages WHERE id = :messageId")
     fun findSimpleMessageById(messageId: String): MessageMinimal?
 
+    @Query("SELECT DISTINCT conversation_id FROM messages WHERE id IN (:messages)")
+    fun findConversationsByMessages(messages: List<String>): List<String>
+
     @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
-    @Query(
-        "SELECT id, conversation_id, user_id, status, created_at FROM messages WHERE conversation_id = :conversationId " +
-            "AND user_id != :userId AND status IN ('SENT', 'DELIVERED') ORDER BY created_at ASC"
+    @Query("""
+            SELECT id, conversation_id, user_id, status, created_at FROM messages WHERE conversation_id = :conversationId 
+            AND user_id != :userId AND status IN ('SENT', 'DELIVERED') ORDER BY created_at ASC
+        """
     )
     fun findUnreadMessagesSync(
         conversationId: String,
@@ -412,6 +427,11 @@ interface MessageDao : BaseDao<Message> {
     @Query("SELECT * FROM messages WHERE id IN (:messageIds) ORDER BY created_at, rowid")
     suspend fun getSortMessagesByIds(messageIds: List<String>): List<Message>
 
-    @Query("INSERT INTO `messages_fts` (`rowid`, `content`, `name`) SELECT `rowid`, `content`, `name` FROM messages WHERE category IN ('PLAIN_TEXT', 'SIGNAL_TEXT', 'PLAIN_DATA', 'SIGNAL_DATA')")
-    suspend fun upgradeFtsMessage()
+    @Query("""
+        SELECT id as message_id, content, name FROM messages 
+        WHERE category IN ('SIGNAL_TEXT', 'SIGNAL_DATA', 'SIGNAL_POST')
+        AND created_at > :after
+        LIMIT :limit OFFSET :offset
+        """)
+    suspend fun batchQueryMessages(limit: Int, offset: Int, after: Long): List<QueryMessage>
 }

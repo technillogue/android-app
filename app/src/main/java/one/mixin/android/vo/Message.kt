@@ -186,6 +186,9 @@ fun Message.isAudio() =
 fun Message.isImage() =
     category == MessageCategory.PLAIN_IMAGE.name || category == MessageCategory.SIGNAL_IMAGE.name
 
+fun Message.isFtsMessage() =
+    category.endsWith("_TEXT") || category.endsWith("_DATA") || category.endsWith("_POST")
+
 enum class MessageCategory {
     SIGNAL_KEY,
     SIGNAL_TEXT,
@@ -265,6 +268,17 @@ fun createPostMessage(
 ) = MessageBuilder(messageId, conversationId, userId, category, status, createdAt)
     .setContent(content)
     .setThumbImage(thumbImage)
+    .build()
+
+fun createAppCardMessage(
+    messageId: String,
+    conversationId: String,
+    userId: String,
+    content: String,
+    createdAt: String,
+    status: String
+) = MessageBuilder(messageId, conversationId, userId, MessageCategory.APP_CARD.name, status, createdAt)
+    .setContent(content)
     .build()
 
 fun createCallMessage(

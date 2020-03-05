@@ -3,26 +3,31 @@ package one.mixin.android.repository
 import android.annotation.SuppressLint
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.map
+import androidx.paging.DataSource
 import androidx.paging.LivePagedListBuilder
 import androidx.paging.PagedList
 import io.reactivex.Observable
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import one.mixin.android.Constants.PAGE_SIZE
 import one.mixin.android.api.service.ConversationService
 import one.mixin.android.db.ConversationDao
 import one.mixin.android.db.JobDao
 import one.mixin.android.db.MessageDao
+import one.mixin.android.db.MessageMentionDao
 import one.mixin.android.db.MessageProvider
 import one.mixin.android.db.MixinDatabase
 import one.mixin.android.db.ParticipantDao
 import one.mixin.android.db.ParticipantSessionDao
 import one.mixin.android.db.batchMarkReadAndTake
+import one.mixin.android.db.deleteMessage
 import one.mixin.android.di.type.DatabaseCategory
 import one.mixin.android.di.type.DatabaseCategoryEnum
+import one.mixin.android.extension.joinStar
+import one.mixin.android.job.AttachmentDeleteJob
+import one.mixin.android.job.MixinJobManager
 import one.mixin.android.ui.media.pager.MediaPagerActivity
 import one.mixin.android.util.SINGLE_DB_THREAD
 import one.mixin.android.util.Session
@@ -33,10 +38,14 @@ import one.mixin.android.vo.ConversationItem
 import one.mixin.android.vo.ConversationStatus
 import one.mixin.android.vo.Job
 import one.mixin.android.vo.MessageItem
+import one.mixin.android.vo.MessageMentionStatus
 import one.mixin.android.vo.MessageMinimal
 import one.mixin.android.vo.Participant
 import one.mixin.android.vo.ParticipantSession
 import one.mixin.android.vo.SearchMessageItem
+import one.mixin.android.vo.createAckJob
+import one.mixin.android.websocket.BlazeAckMessage
+import one.mixin.android.websocket.CREATE_MESSAGE
 
 @Singleton
 class ConversationRepository
@@ -55,19 +64,20 @@ internal constructor(
     @DatabaseCategory(DatabaseCategoryEnum.READ)
     private val readConversationDao: ConversationDao,
     private val participantDao: ParticipantDao,
+    private val messageMentionDao: MessageMentionDao,
     private val participantSessionDao: ParticipantSessionDao,
     private val jobDao: JobDao,
-    private val conversationService: ConversationService
+    private val conversationService: ConversationService,
+    private val jobManager: MixinJobManager
 ) {
 
     @SuppressLint("RestrictedApi")
     fun getMessages(conversationId: String) =
         MessageProvider.getMessages(conversationId, readAppDatabase)
 
-    fun conversation(): LiveData<List<ConversationItem>> = readConversationDao.conversationList()
+    fun conversations(): DataSource.Factory<Int, ConversationItem> = conversationDao.conversationList()
 
-    fun successConversationList(): LiveData<List<ConversationItem>> =
-        readConversationDao.successConversationList()
+    suspend fun successConversationList(): List<ConversationItem> = readConversationDao.successConversationList()
 
     suspend fun insertConversation(conversation: Conversation, participants: List<Participant>) =
         withContext(SINGLE_DB_THREAD) {
@@ -93,7 +103,7 @@ internal constructor(
         }
 
     fun searchConversationById(conversationId: String) =
-        readConversationDao.searchConversationById(conversationId)
+        conversationDao.searchConversationById(conversationId)
 
     fun findMessageById(messageId: String) = messageDao.findMessageById(messageId)
 
@@ -106,10 +116,10 @@ internal constructor(
         readConversationDao.getConversation(conversationId)
 
     suspend fun fuzzySearchMessage(query: String, limit: Int): List<SearchMessageItem> =
-        readMessageDao.fuzzySearchMessage("$query*", limit)
+        readMessageDao.fuzzySearchMessage(query.joinStar(), limit)
 
     fun fuzzySearchMessageDetail(query: String, conversationId: String) =
-        readMessageDao.fuzzySearchMessageByConversationId("$query*", conversationId)
+        readMessageDao.fuzzySearchMessageByConversationId(query.joinStar(), conversationId)
 
     suspend fun fuzzySearchChat(query: String): List<ChatMinimal> =
         readConversationDao.fuzzySearchChat(query)
@@ -166,16 +176,24 @@ internal constructor(
     fun getGroupParticipantsLiveData(conversationId: String) =
         participantDao.getGroupParticipantsLiveData(conversationId)
 
-    fun getGroupBotsLiveData(conversationId: String) =
-        participantDao.getGroupBotsLiveData(conversationId)
-
     suspend fun updateMediaStatus(status: String, messageId: String) =
         messageDao.updateMediaStatusSuspend(status, messageId)
 
-    fun deleteMessage(id: String) = messageDao.deleteMessage(id)
+    fun deleteMessage(id: String, mediaUrl: String? = null) {
+        if (!mediaUrl.isNullOrBlank()) {
+            jobManager.addJobInBackground(AttachmentDeleteJob(mediaUrl))
+        }
+        appDatabase.deleteMessage(id)
+    }
 
-    suspend fun deleteConversationById(conversationId: String) =
+    suspend fun deleteConversationById(conversationId: String) {
+        messageDao.findAllMediaPathByConversationId(conversationId).let { list ->
+            if (list.isNotEmpty()) {
+                jobManager.addJobInBackground(AttachmentDeleteJob(* list.toTypedArray()))
+            }
+        }
         conversationDao.deleteConversationById(conversationId)
+    }
 
     suspend fun updateConversationPinTimeById(conversationId: String, pinTime: String?) =
         withContext(SINGLE_DB_THREAD) {
@@ -183,7 +201,13 @@ internal constructor(
         }
 
     suspend fun deleteMessageByConversationId(conversationId: String) = coroutineScope {
+        messageDao.findAllMediaPathByConversationId(conversationId).let { list ->
+            if (list.isNotEmpty()) {
+                jobManager.addJobInBackground(AttachmentDeleteJob(* list.toTypedArray()))
+            }
+        }
         messageDao.deleteMessageByConversationId(conversationId)
+        messageMentionDao.deleteMessageByConversationId(conversationId)
     }
 
     suspend fun getRealParticipants(conversationId: String) =
@@ -217,8 +241,7 @@ internal constructor(
     fun getConversationStorageUsage() = readConversationDao.getConversationStorageUsage()
 
     fun getMediaByConversationIdAndCategory(conversationId: String, category: String) =
-        readMessageDao
-            .getMediaByConversationIdAndCategory(conversationId, category)
+        readMessageDao.getMediaByConversationIdAndCategory(conversationId, category)
 
     suspend fun findMessageIndex(conversationId: String, messageId: String) =
         readMessageDao.findMessageIndex(conversationId, messageId)
@@ -234,7 +257,7 @@ internal constructor(
         jobDao.insertList(it)
     }
 
-    fun refreshConversation(conversationId: String) {
+    fun refreshConversation(conversationId: String): Boolean {
         try {
             val call = conversationService.getConversation(conversationId).execute()
             val response = call.body()
@@ -261,9 +284,12 @@ internal constructor(
                         conversationData.createdAt,
                         status
                     )
+                    return true
                 }
             }
-        } catch (e: IOException) {
+            return false
+        } catch (e: Exception) {
+            return false
         }
     }
 
@@ -301,7 +327,14 @@ internal constructor(
     suspend fun insertParticipantSession(ps: List<ParticipantSession>) =
         participantSessionDao.insertListSuspend(ps)
 
-    suspend fun upgradeFtsMessage() = messageDao.upgradeFtsMessage()
-
     suspend fun getAnnouncementByConversationId(conversationId: String) = conversationDao.getAnnouncementByConversationId(conversationId)
+
+    fun getUnreadMentionMessageByConversationId(conversationId: String) = messageMentionDao.getUnreadMentionMessageByConversationId(conversationId)
+
+    suspend fun markMentionRead(messageId: String, conversationId: String) {
+        messageMentionDao.suspendMarkMentionRead(messageId)
+        withContext(Dispatchers.IO) {
+            jobDao.insert(createAckJob(CREATE_MESSAGE, BlazeAckMessage(messageId, MessageMentionStatus.MENTION_READ.name), conversationId))
+        }
+    }
 }

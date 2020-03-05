@@ -30,7 +30,8 @@ object Constants {
         const val PREF_LAST_USER_ID = "pref_last_user_id"
         const val PREF_BIOMETRICS = "pref_biometrics"
         const val PREF_WRONG_TIME = "pref_wrong_time"
-        const val PREF_FTS_UPGRADE = "pref_fts_upgrade"
+        const val PREF_FTS4_UPGRADE = "pref_fts4_upgrade"
+        const val PREF_SYNC_FTS4_OFFSET = "sync_fts4_offset"
         const val PREF_RESTORE = "pref_restore"
         const val PREF_EXTENSION_SESSION_ID = "pref_extension_session_id"
         const val PREF_RECALL_SHOW = "pref_recall_show"
@@ -38,8 +39,6 @@ object Constants {
         const val PREF_RECENT_USED_BOTS = "pref_recent_used_bots"
         const val PREF_DELETE_MOBILE_CONTACTS = "pref_delete_mobile_contacts"
         const val PREF_FIAT_MAP = "pref_fiat_map"
-        const val PREF_SET_LANGUAGE = "pref_set_language"
-        const val PREF_LANGUAGE = "pref_language"
         const val PREF_NOTIFICATION_ON = "pref_notification_on"
     }
 
@@ -67,7 +66,7 @@ object Constants {
     object DataBase {
         const val DB_NAME = "mixin.db"
         const val MINI_VERSION = 15
-        const val CURRENT_VERSION = 27
+        const val CURRENT_VERSION = 29
     }
 
     object BackUp {
@@ -93,6 +92,7 @@ object Constants {
         const val THEME_CURRENT_ID = "theme_current_id"
         const val THEME_DEFAULT_ID = 0
         const val THEME_NIGHT_ID = 1
+        const val THEME_AUTO_ID = 2
     }
 
     object Load {
@@ -128,7 +128,8 @@ object Constants {
 
     const val BATCH_SIZE = 700
 
-    const val PAGE_SIZE = 60
+    const val PAGE_SIZE = 30
+    const val CONVERSATION_PAGE_SIZE = 20
 
     const val BIOMETRICS_ALIAS = "biometrics_alias"
     const val BIOMETRICS_PIN = "biometrics_pin"

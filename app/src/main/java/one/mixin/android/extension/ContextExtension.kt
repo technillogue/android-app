@@ -13,7 +13,6 @@ import android.content.res.Configuration
 import android.database.Cursor
 import android.graphics.BitmapFactory
 import android.graphics.Point
-import android.hardware.SensorManager
 import android.media.MediaMetadataRetriever
 import android.net.ConnectivityManager
 import android.net.NetworkInfo
@@ -36,7 +35,6 @@ import android.view.ViewConfiguration
 import android.view.Window
 import android.view.WindowManager
 import androidx.annotation.IdRes
-import androidx.appcompat.app.AlertDialog
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -142,12 +140,10 @@ fun Context.dpToPx(dp: Float): Int {
     return if (dp == 0f) {
         0
     } else {
-        Math.ceil((this.resources.displayMetrics.density * dp).toDouble()).toInt()
+        val scale = resources.displayMetrics.density
+        (dp * scale + 0.5f).toInt()
     }
 }
-
-fun Context.spToPX(sp: Float): Int =
-    TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, this.resources.displayMetrics).toInt()
 
 fun Context.getPixelsInCM(cm: Float, isX: Boolean): Float =
     cm / 2.54f * if (isX) displayMetrics.xdpi else displayMetrics.ydpi
@@ -279,7 +275,7 @@ const val REQUEST_AUDIO = 0x05
 fun Fragment.openImage(output: Uri) {
     val cameraIntents = ArrayList<Intent>()
     val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-    val packageManager = this.activity!!.packageManager
+    val packageManager = this.requireActivity().packageManager
     val listCam = packageManager.queryIntentActivities(captureIntent, 0)
     for (res in listCam) {
         val packageName = res.activityInfo.packageName
@@ -598,29 +594,6 @@ inline fun belowOreo(code: () -> Unit) {
 inline fun <T : Fragment> T.withArgs(argsBuilder: Bundle.() -> Unit): T =
     this.apply { arguments = Bundle().apply(argsBuilder) }
 
-// Compute scroll by velocity
-
-const val INFLEXION = 0.35f
-
-private val flingFriction by lazy {
-    ViewConfiguration.getScrollFriction()
-}
-private val DECELERATION_RATE = Math.log(0.78) / Math.log(0.9)
-
-fun Context.getPPI() = displayMetrics.density * 160f
-
-fun Context.getPhysicalCoeff() = SensorManager.GRAVITY_EARTH * 39.37f * getPPI() * 0.84f
-
-fun Context.getSplineDeceleration(velocity: Int): Double {
-    return Math.log((INFLEXION * Math.abs(velocity) / (flingFriction * getPhysicalCoeff())).toDouble())
-}
-
-fun Context.getSplineFlingDistance(velocity: Int): Double {
-    val l = getSplineDeceleration(velocity)
-    val decelMinusOne = DECELERATION_RATE - 1.0
-    return flingFriction.toDouble() * getPhysicalCoeff().toDouble() * Math.exp(DECELERATION_RATE / decelMinusOne * l)
-}
-
 fun Context.isGooglePlayServicesAvailable() =
     GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS &&
         Locale.getDefault() != Locale.CHINA
@@ -638,7 +611,7 @@ fun Context.showConfirmDialog(
     message: String,
     action: () -> Unit
 ) {
-    AlertDialog.Builder(this, R.style.MixinAlertDialogTheme)
+    alertDialogBuilder()
         .setMessage(message)
         .setNegativeButton(R.string.cancel) { dialog, _ ->
             dialog.dismiss()
@@ -654,7 +627,15 @@ fun Context.showConfirmDialog(
 
 fun Context.isNightMode(): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        val currentId = defaultSharedPreferences.getInt(
+            Constants.Theme.THEME_CURRENT_ID,
+            Constants.Theme.THEME_AUTO_ID
+        )
+        return if (currentId == Constants.Theme.THEME_AUTO_ID) {
+            configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        } else {
+            currentId == Constants.Theme.THEME_NIGHT_ID
+        }
     } else {
         defaultSharedPreferences.getInt(
             Constants.Theme.THEME_CURRENT_ID,
@@ -666,3 +647,7 @@ fun Context.isNightMode(): Boolean {
 fun Context.isLandscape() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
 fun Context.isAutoRotate() = Settings.System.getInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
+
+fun Fragment.toast(textResource: Int) = requireActivity().toast(textResource)
+
+fun Fragment.toast(text: CharSequence) = requireActivity().toast(text)

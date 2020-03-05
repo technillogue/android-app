@@ -24,15 +24,16 @@ import kotlinx.coroutines.launch
 import one.mixin.android.MixinApplication
 import one.mixin.android.R
 import one.mixin.android.api.service.MessageService
-import one.mixin.android.crypto.Base64
 import one.mixin.android.db.FloodMessageDao
 import one.mixin.android.db.JobDao
 import one.mixin.android.db.MixinDatabase
 import one.mixin.android.db.ParticipantDao
 import one.mixin.android.di.type.DatabaseCategory
 import one.mixin.android.di.type.DatabaseCategoryEnum
+import one.mixin.android.extension.base64Encode
 import one.mixin.android.extension.networkConnected
 import one.mixin.android.extension.supportsOreo
+import one.mixin.android.job.BaseJob.Companion.PRIORITY_ACK_MESSAGE
 import one.mixin.android.receiver.ExitBroadcastReceiver
 import one.mixin.android.ui.home.MainActivity
 import one.mixin.android.util.GsonHelper
@@ -162,7 +163,7 @@ class BlazeMessageService : LifecycleService(), NetworkEventProvider.Listener, C
             .setSmallIcon(R.drawable.ic_msg_default)
             .addAction(R.drawable.ic_close_black, getString(R.string.exit), exitPendingIntent)
 
-        val pendingIntent = PendingIntent.getActivity(this, 0, MainActivity.getSingleIntent(this), 0)
+        val pendingIntent = PendingIntent.getActivity(this, 0, MainActivity.getWakeUpIntent(this), 0)
         builder.setContentIntent(pendingIntent)
 
         supportsOreo {
@@ -232,9 +233,9 @@ class BlazeMessageService : LifecycleService(), NetworkEventProvider.Listener, C
                     action = PlainDataAction.ACKNOWLEDGE_MESSAGE_RECEIPTS.name,
                     ackMessages = it)
             )
-            val encoded = Base64.encodeBytes(plainText.toByteArray())
+            val encoded = plainText.toByteArray().base64Encode()
             val bm = createParamBlazeMessage(createPlainJsonParam(participantDao.joinedConversationId(accountId), accountId, encoded, sessionId))
-            jobManager.addJobInBackground(SendPlaintextJob(bm))
+            jobManager.addJobInBackground(SendPlaintextJob(bm, PRIORITY_ACK_MESSAGE))
             jobDao.deleteList(jobs)
         }
     }

@@ -4,13 +4,16 @@ import com.birbit.android.jobqueue.Params
 import com.bugsnag.android.Bugsnag
 import java.io.File
 import one.mixin.android.RxBus
-import one.mixin.android.crypto.Base64
 import one.mixin.android.event.RecallEvent
+import one.mixin.android.extension.base64Encode
 import one.mixin.android.extension.findLastUrl
 import one.mixin.android.extension.getBotNumber
 import one.mixin.android.extension.getFilePath
 import one.mixin.android.util.GsonHelper
+import one.mixin.android.util.MessageFts4Helper
 import one.mixin.android.util.Session
+import one.mixin.android.util.mention.parseMentionData
+import one.mixin.android.vo.MentionUser
 import one.mixin.android.vo.Message
 import one.mixin.android.vo.MessageCategory
 import one.mixin.android.vo.isCall
@@ -31,7 +34,7 @@ open class SendMessageJob(
     private val recallMessageId: String? = null,
     messagePriority: Int = PRIORITY_SEND_MESSAGE
 ) : MixinJob(
-    Params(messagePriority).addTags(message.id).groupBy("send_message_group")
+    Params(messagePriority).groupBy("send_message_group")
         .requireWebSocketConnected().persist(), message.id
 ) {
 
@@ -40,7 +43,7 @@ open class SendMessageJob(
     }
 
     override fun cancel() {
-        isCancel = true
+        isCancelled = true
         removeJob()
     }
 
@@ -60,8 +63,14 @@ open class SendMessageJob(
             if (message.isRecall()) {
                 recallMessage()
             } else {
+                if (message.isText()) {
+                    message.content?.let { content ->
+                        parseMentionData(content, message.id, message.conversationId, userDao, messageMentionDao, message.userId)
+                    }
+                    parseHyperlink()
+                }
                 messageDao.insert(message)
-                parseHyperlink()
+                MessageFts4Helper.insertOrReplaceMessageFts4(message)
             }
         } else {
             Bugsnag.notify(Throwable("Insert failed, no conversation $alreadyExistMessage"))
@@ -70,6 +79,7 @@ open class SendMessageJob(
 
     private fun recallMessage() {
         messageDao.recallMessage(recallMessageId!!)
+        messageMentionDao.deleteMessage(recallMessageId)
         messageDao.findMessageById(recallMessageId)?.let { msg ->
             RxBus.publish(RecallEvent(msg.id))
             messageDao.recallFailedMessage(msg.id)
@@ -88,15 +98,13 @@ open class SendMessageJob(
                     GsonHelper.customGson.toJson(quoteMsg)
                 )
             }
-            jobManager.cancelJobById(msg.id)
+            jobManager.cancelJobByMixinJobId(msg.id)
         }
     }
 
     private fun parseHyperlink() {
-        if (message.category.endsWith("_TEXT")) {
-            message.content?.findLastUrl()?.let {
-                jobManager.addJobInBackground(ParseHyperlinkJob(it, message.id))
-            }
+        message.content?.findLastUrl()?.let {
+            jobManager.addJobInBackground(ParseHyperlinkJob(it, message.id))
         }
     }
 
@@ -106,6 +114,10 @@ open class SendMessageJob(
     }
 
     override fun onRun() {
+        if (isCancelled) {
+            removeJob()
+            return
+        }
         jobManager.saveJob(this)
         if (message.isText()) {
             val botNumber = message.content?.getBotNumber()
@@ -116,7 +128,7 @@ open class SendMessageJob(
                 }
             }
         }
-        if (message.isPlain() || message.isCall() || message.isRecall()) {
+        if (message.isPlain() || message.isCall() || message.isRecall() || message.category == MessageCategory.APP_CARD.name) {
             sendPlainMessage()
         } else {
             sendSignalMessage()
@@ -128,9 +140,12 @@ open class SendMessageJob(
         val conversation = conversationDao.getConversation(message.conversationId) ?: return
         checkConversationExist(conversation)
         var content = message.content
-        if (message.category == MessageCategory.PLAIN_TEXT.name || message.isCall()) {
+        if (message.category == MessageCategory.PLAIN_TEXT.name ||
+            message.category == MessageCategory.PLAIN_POST.name ||
+            message.isCall() ||
+            message.category == MessageCategory.APP_CARD.name) {
             if (message.content != null) {
-                content = Base64.encodeBytes(message.content!!.toByteArray())
+                content = message.content!!.base64Encode()
             }
         }
         val blazeParam = BlazeMessageParam(
@@ -139,7 +154,8 @@ open class SendMessageJob(
             message.id,
             message.category,
             content,
-            quote_message_id = message.quoteMessageId
+            quote_message_id = message.quoteMessageId,
+            mentions = getMentionData(message.id)
         )
         val blazeMessage = if (message.isCall()) {
             createCallMessage(blazeParam)
@@ -169,10 +185,21 @@ open class SendMessageJob(
                 message,
                 resendData.userId,
                 resendData.messageId,
-                resendData.sessionId
+                resendData.sessionId,
+                getMentionData(message.id)
             )
         } else {
-            signalProtocol.encryptGroupMessage(message)
+            signalProtocol.encryptGroupMessage(message, getMentionData(message.id))
+        }
+    }
+
+    private fun getMentionData(messageId: String): List<String>? {
+        return messageMentionDao.getMentionData(messageId)?.run {
+            GsonHelper.customGson.fromJson(this, Array<MentionUser>::class.java).map {
+                it.identityNumber
+            }.toSet()
+        }?.run {
+            userDao.findMultiUserIdsByIdentityNumbers(this)
         }
     }
 }

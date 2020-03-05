@@ -1,6 +1,7 @@
 package one.mixin.android.db
 
 import androidx.lifecycle.LiveData
+import androidx.paging.DataSource
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.RoomWarnings
@@ -25,10 +26,13 @@ interface ConversationDao : BaseDao<Conversation> {
             m.content AS content, m.category AS contentType, m.created_at AS createdAt, m.media_url AS mediaUrl,
             m.user_id AS senderId, m.action AS actionName, m.status AS messageStatus,
             mu.full_name AS senderFullName, s.type AS SnapshotType,
-            pu.full_name AS participantFullName, pu.user_id AS participantUserId
+            pu.full_name AS participantFullName, pu.user_id AS participantUserId,
+            (SELECT count(*) FROM message_mentions me WHERE me.conversation_id = c.conversation_id AND me.has_read = 0) as mentionCount,  
+            mm.mentions AS mentions 
             FROM conversations c
             INNER JOIN users ou ON ou.user_id = c.owner_id
             LEFT JOIN messages m ON c.last_message_id = m.id
+            LEFT JOIN message_mentions mm ON mm.message_id = m.id
             LEFT JOIN users mu ON mu.user_id = m.user_id
             LEFT JOIN snapshots s ON s.snapshot_id = m.snapshot_id
             LEFT JOIN users pu ON pu.user_id = m.participant_id 
@@ -45,13 +49,13 @@ interface ConversationDao : BaseDao<Conversation> {
             END 
             DESC
         """)
-    fun conversationList(): LiveData<List<ConversationItem>>
+    fun conversationList(): DataSource.Factory<Int, ConversationItem>
 
     @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
     @Query(PREFIX_CONVERSATION_ITEM +
         "WHERE c.category IS NOT NULL AND c.status = 2 " +
         "ORDER BY c.pin_time DESC, m.created_at DESC")
-    fun successConversationList(): LiveData<List<ConversationItem>>
+    suspend fun successConversationList(): List<ConversationItem>
 
     @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
     @Query("""

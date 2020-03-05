@@ -3,40 +3,32 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/user_info_rl"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/item_contact_height"
+    android:layout_height="80dp"
     android:background="?attr/bg_white"
     android:foreground="?attr/selectableItemBackground">
 
-    <one.mixin.android.widget.AvatarView
-        android:id="@+id/avatar"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_alignParentStart="true"
-        android:layout_margin="12dp"/>
-
-    <TextView
-        android:id="@+id/deauthorize"
+    <Space
+        android:id="@+id/center"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"/>
+
+    <one.mixin.android.widget.AvatarView
+        android:id="@+id/avatar"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
         android:layout_centerVertical="true"
-        android:layout_marginEnd="12dp"
-        android:background="@drawable/bg_deauthor"
-        android:paddingStart="6dp"
-        android:paddingTop="3dp"
-        android:paddingEnd="6dp"
-        android:paddingBottom="3dp"
-        android:text="@string/setting_deauthorize"
-        android:textColor="@color/colorRed"/>
+        android:layout_marginStart="30dp"
+        android:layout_marginEnd="@dimen/margin16"
+        android:layout_alignParentStart="true"/>
 
     <TextView
         android:id="@+id/name_tv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignTop="@id/avatar"
-        android:layout_centerVertical="true"
-        android:layout_marginEnd="12dp"
-        android:layout_toStartOf="@id/deauthorize"
+        android:layout_marginEnd="@dimen/margin16"
+        android:layout_above="@id/center"
+        android:layout_marginBottom="2dp"
         android:layout_toEndOf="@id/avatar"
         android:ellipsize="end"
         android:textColor="?attr/text_primary"
@@ -46,10 +38,9 @@
         android:id="@+id/number_tv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignBottom="@id/avatar"
-        android:layout_centerVertical="true"
-        android:layout_marginEnd="12dp"
-        android:layout_toStartOf="@id/deauthorize"
+        android:layout_below="@id/center"
+        android:layout_marginEnd="@dimen/margin16"
+        android:layout_marginTop="2dp"
         android:layout_toEndOf="@id/avatar"
         android:ellipsize="end"
         android:textColor="?attr/text_minor"

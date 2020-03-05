@@ -32,6 +32,7 @@ import one.mixin.android.db.HyperlinkDao
 import one.mixin.android.db.JobDao
 import one.mixin.android.db.MessageDao
 import one.mixin.android.db.MessageHistoryDao
+import one.mixin.android.db.MessageMentionDao
 import one.mixin.android.db.MixinDatabase
 import one.mixin.android.db.OffsetDao
 import one.mixin.android.db.ParticipantDao
@@ -144,6 +145,9 @@ abstract class BaseJob(params: Params) : Job(params), Injectable {
     lateinit var favoriteAppDao: FavoriteAppDao
     @Inject
     @Transient
+    lateinit var messageMentionDao: MessageMentionDao
+    @Inject
+    @Transient
     lateinit var appDao: AppDao
     @Inject
     @Transient
@@ -218,5 +222,6 @@ abstract class BaseJob(params: Params) : Job(params), Injectable {
         const val PRIORITY_BACKGROUND = 10
         const val PRIORITY_DELIVERED_ACK_MESSAGE = 7
         const val PRIORITY_ACK_MESSAGE = 5
+        const val PRIORITY_SYNC_FTS = 3
     }
 }

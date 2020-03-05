@@ -2,30 +2,36 @@ package one.mixin.android.job
 
 import com.birbit.android.jobqueue.Job
 import com.birbit.android.jobqueue.JobManager
+import com.birbit.android.jobqueue.TagConstraint
 import com.birbit.android.jobqueue.config.Configuration
 import java.util.concurrent.ConcurrentHashMap
 
 class MixinJobManager(configuration: Configuration) : JobManager(configuration) {
 
-    private val map: ConcurrentHashMap<String, MixinJob> by lazy {
-        ConcurrentHashMap<String, MixinJob>()
-    }
+    private val map: ConcurrentHashMap<String, MixinJob> = ConcurrentHashMap()
 
     fun saveJob(job: Job) {
         if (job is MixinJob) {
-            map[job.jobId] = job
+            map[job.mixinJobId] = job
         }
     }
 
-    fun removeJob(id: String) {
-        map.remove(id)
+    fun removeJobByMixinJobId(mixinJobId: String) {
+        map.remove(mixinJobId)
     }
 
-    fun cancelJobById(id: String) {
-        findJobById(id)?.cancel()
+    fun cancelJobByMixinJobId(mixinJobId: String, notFoundAction: (() -> Unit)? = null) {
+        val mixinJob = findJobByMixinJobId(mixinJobId)
+        if (mixinJob == null) {
+            notFoundAction?.invoke()
+            cancelJobsInBackground(null, TagConstraint.ANY, mixinJobId)
+        } else {
+            mixinJob.cancel()
+            cancelJobsInBackground(null, TagConstraint.ANY, mixinJobId)
+        }
     }
 
-    fun findJobById(id: String): MixinJob? = map[id]
+    private fun findJobByMixinJobId(mixinJobId: String): MixinJob? = map[mixinJobId]
 
     fun cancelAllJob() {
         for (job in map.values) {

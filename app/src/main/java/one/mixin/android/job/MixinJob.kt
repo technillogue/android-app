@@ -9,6 +9,7 @@ import java.util.UUID
 import one.mixin.android.Constants.SLEEP_MILLIS
 import one.mixin.android.MixinApplication
 import one.mixin.android.RxBus
+import one.mixin.android.api.ChecksumException
 import one.mixin.android.api.NetworkException
 import one.mixin.android.api.SignalKey
 import one.mixin.android.api.WebSocketException
@@ -17,8 +18,8 @@ import one.mixin.android.api.request.ConversationRequest
 import one.mixin.android.api.request.ParticipantRequest
 import one.mixin.android.api.response.ConversationResponse
 import one.mixin.android.api.response.UserSession
-import one.mixin.android.crypto.Base64
 import one.mixin.android.event.GroupEvent
+import one.mixin.android.extension.base64Encode
 import one.mixin.android.extension.fromJson
 import one.mixin.android.extension.getDeviceId
 import one.mixin.android.extension.networkConnected
@@ -51,12 +52,11 @@ import one.mixin.android.websocket.createConsumeSessionSignalKeys
 import one.mixin.android.websocket.createConsumeSignalKeysParam
 import one.mixin.android.websocket.createSignalKeyMessage
 import one.mixin.android.websocket.createSignalKeyMessageParam
-import timber.log.Timber
 
-abstract class MixinJob(params: Params, val jobId: String) : BaseJob(params) {
-
-    protected var isCancel = false
-
+abstract class MixinJob(
+    params: Params,
+    val mixinJobId: String
+) : BaseJob(params.addTags(mixinJobId)) {
     companion object {
         private const val serialVersionUID = 1L
         val TAG = MixinJob::class.java.simpleName
@@ -66,15 +66,16 @@ abstract class MixinJob(params: Params, val jobId: String) : BaseJob(params) {
     }
 
     protected fun removeJob() {
-        jobManager.removeJob(jobId)
+        try {
+            jobManager.removeJobByMixinJobId(mixinJobId)
+        } catch (ignored: Exception) {
+        }
     }
 
     override fun shouldRetry(throwable: Throwable): Boolean {
-        return if (isCancel) {
-            Timber.d("cancel")
+        return if (isCancelled) {
             false
         } else {
-            Timber.d("no cancel")
             super.shouldRetry(throwable)
         }
     }
@@ -234,7 +235,7 @@ abstract class MixinJob(params: Params, val jobId: String) : BaseJob(params) {
                 blazeMessage.params?.conversation_id?.let {
                     syncConversation(it)
                 }
-                throw WebSocketException()
+                throw ChecksumException()
             } else if (bm.error.code == FORBIDDEN) {
                 return true
             } else {
@@ -274,7 +275,7 @@ abstract class MixinJob(params: Params, val jobId: String) : BaseJob(params) {
 
     protected fun sendNoKeyMessage(conversationId: String, recipientId: String) {
         val plainText = Gson().toJson(PlainJsonMessagePayload(PlainDataAction.NO_KEY.name))
-        val encoded = Base64.encodeBytes(plainText.toByteArray())
+        val encoded = plainText.base64Encode()
         val params = BlazeMessageParam(
             conversationId, recipientId, UUID.randomUUID().toString(),
             MessageCategory.PLAIN_JSON.name, encoded, MessageStatus.SENDING.name
@@ -297,7 +298,7 @@ abstract class MixinJob(params: Params, val jobId: String) : BaseJob(params) {
             category = conversation.category, participants = arrayListOf(ParticipantRequest(conversation.ownerId!!, ""))
         )
         val response = conversationApi.create(request).execute().body()
-        if (response != null && response.isSuccess && response.data != null && !isCancel) {
+        if (response != null && response.isSuccess && response.data != null && !isCancelled) {
             conversationDao.updateConversationStatusById(conversation.conversationId, ConversationStatus.SUCCESS.ordinal)
 
             val sessionParticipants = response.data!!.participantSessions.let { resp ->
@@ -352,8 +353,12 @@ abstract class MixinJob(params: Params, val jobId: String) : BaseJob(params) {
         val common = remote.intersect(local)
         val remove = local.minus(common)
         val add = remote.minus(common)
-        participantSessionDao.deleteList(remove)
-        participantSessionDao.insertList(add)
+        if (remove.isNotEmpty()) {
+            participantSessionDao.deleteList(remove)
+        }
+        if (add.isNotEmpty()) {
+            participantSessionDao.insertList(add)
+        }
     }
 
     protected fun insertOrUpdateConversation(data: ConversationResponse) {

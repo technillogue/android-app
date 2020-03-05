@@ -1,7 +1,6 @@
 package one.mixin.android.ui.common
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -10,10 +9,8 @@ import androidx.lifecycle.Lifecycle
 import com.uber.autodispose.android.lifecycle.scope
 import dagger.android.DispatchingAndroidInjector
 import dagger.android.HasAndroidInjector
-import java.util.Locale
 import javax.inject.Inject
-import one.mixin.android.Constants.Account.PREF_LANGUAGE
-import one.mixin.android.Constants.Account.PREF_SET_LANGUAGE
+import one.mixin.android.Constants.Theme.THEME_AUTO_ID
 import one.mixin.android.Constants.Theme.THEME_CURRENT_ID
 import one.mixin.android.Constants.Theme.THEME_DEFAULT_ID
 import one.mixin.android.Constants.Theme.THEME_NIGHT_ID
@@ -28,24 +25,12 @@ open class BaseActivity : AppCompatActivity(), HasAndroidInjector {
 
     protected val stopScope = scope(Lifecycle.Event.ON_STOP)
 
+    lateinit var lastLang: String
+
     @Inject
     lateinit var dispatchingAndroidInjector: DispatchingAndroidInjector<Any>
 
     override fun androidInjector() = dispatchingAndroidInjector
-
-    override fun attachBaseContext(context: Context) {
-        val setLanguage = context.defaultSharedPreferences.getBoolean(PREF_SET_LANGUAGE, false)
-        if (setLanguage) {
-            val conf = context.resources.configuration
-            val defaultLang = Locale.getDefault().language
-            val language = context.defaultSharedPreferences.getString(PREF_LANGUAGE, defaultLang)
-                ?: defaultLang
-            conf.setLocale(Locale(language))
-            super.attachBaseContext(context.createConfigurationContext(conf))
-        } else {
-            super.attachBaseContext(context)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +48,15 @@ open class BaseActivity : AppCompatActivity(), HasAndroidInjector {
 
     protected fun isNightMode(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+            val currentId = defaultSharedPreferences.getInt(
+                THEME_CURRENT_ID,
+                THEME_AUTO_ID
+            )
+            return if (currentId == THEME_AUTO_ID) {
+                configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+            } else {
+                currentId == THEME_NIGHT_ID
+            }
         } else {
             defaultSharedPreferences.getInt(
                 THEME_CURRENT_ID,

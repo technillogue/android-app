@@ -1,6 +1,6 @@
 package one.mixin.android.ui.home
 
-import android.app.AlertDialog
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -8,6 +8,7 @@ import android.content.IntentSender
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.getSystemService
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
@@ -17,6 +18,7 @@ import com.crashlytics.android.Crashlytics
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.safetynet.SafetyNet
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.InstallStateUpdatedListener
@@ -49,6 +51,7 @@ import one.mixin.android.db.ParticipantDao
 import one.mixin.android.db.UserDao
 import one.mixin.android.di.type.DatabaseCategory
 import one.mixin.android.di.type.DatabaseCategoryEnum
+import one.mixin.android.extension.alert
 import one.mixin.android.extension.defaultSharedPreferences
 import one.mixin.android.extension.enqueueOneTimeNetworkWorkRequest
 import one.mixin.android.extension.inTransaction
@@ -79,7 +82,6 @@ import one.mixin.android.ui.landing.RestoreActivity
 import one.mixin.android.ui.search.SearchFragment
 import one.mixin.android.ui.search.SearchMessageFragment
 import one.mixin.android.ui.search.SearchSingleFragment
-import one.mixin.android.ui.setting.SettingFragment.Companion.ARGS_RECREATE
 import one.mixin.android.util.BiometricUtil
 import one.mixin.android.util.ErrorHandler
 import one.mixin.android.util.RootUtil
@@ -95,7 +97,6 @@ import one.mixin.android.worker.RefreshAccountWorker
 import one.mixin.android.worker.RefreshAssetsWorker
 import one.mixin.android.worker.RefreshContactWorker
 import one.mixin.android.worker.RefreshFcmWorker
-import org.jetbrains.anko.alert
 import org.jetbrains.anko.doAsync
 
 class MainActivity : BlazeBaseActivity() {
@@ -163,11 +164,12 @@ class MainActivity : BlazeBaseActivity() {
         }
 
         MixinApplication.get().onlining.set(true)
-        if (!defaultSharedPreferences.getBoolean(Constants.Account.PREF_FTS_UPGRADE, false)) {
+        if (!defaultSharedPreferences.getBoolean(Constants.Account.PREF_FTS4_UPGRADE, false)) {
             InitializeActivity.showFts(this)
             finish()
             return
         }
+
         if (!defaultSharedPreferences.getBoolean(IS_LOADED, false) ||
             !defaultSharedPreferences.getBoolean(IS_SYNC_SESSION, false)
         ) {
@@ -228,7 +230,7 @@ class MainActivity : BlazeBaseActivity() {
 
     private fun delayShowModifyMobile() = lifecycleScope.launch {
         delay(2000)
-        androidx.appcompat.app.AlertDialog.Builder(this@MainActivity, R.style.MixinAlertDialogTheme)
+        MaterialAlertDialogBuilder(this@MainActivity, R.style.MixinAlertDialogTheme)
             .setTitle(getString(R.string.setting_emergency_change_mobile))
             .setPositiveButton(R.string.change) { dialog, _ ->
                 supportFragmentManager.inTransaction {
@@ -346,10 +348,6 @@ class MainActivity : BlazeBaseActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
-        if (intent.getBooleanExtra(ARGS_RECREATE, false)) {
-            recreate()
-            return
-        }
         super.onNewIntent(intent)
         handlerCode(intent)
     }
@@ -378,13 +376,9 @@ class MainActivity : BlazeBaseActivity() {
             } else {
                 toast(R.string.transfer_without_pin)
             }
-        } else if (intent.extras != null && intent.extras!!.getString(
-                "conversation_id",
-                null
-            ) != null
-        ) {
+        } else if (intent.extras != null && intent.extras!!.getString("conversation_id", null) != null) {
             alertDialog?.dismiss()
-            alertDialog = alert(getString(R.string.group_wait)) {}.show()
+            alertDialog = alert(getString(R.string.group_wait)).show()
             val conversationId = intent.extras!!.getString("conversation_id")!!
             Maybe.just(conversationId).map {
                 val innerIntent: Intent?
@@ -563,24 +557,6 @@ class MainActivity : BlazeBaseActivity() {
         private const val TRANSFER = "transfer"
         private const val WALLET = "wallet"
 
-        fun showUrl(context: Context, url: String) {
-            Intent(context, MainActivity::class.java).apply {
-                putExtra(URL, url)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }.run {
-                context.startActivity(this)
-            }
-        }
-
-        fun showTransfer(context: Context, userId: String) {
-            Intent(context, MainActivity::class.java).apply {
-                putExtra(TRANSFER, userId)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }.run {
-                context.startActivity(this)
-            }
-        }
-
         fun showWallet(context: Context) {
             Intent(context, MainActivity::class.java).apply {
                 putExtra(WALLET, true)
@@ -590,11 +566,26 @@ class MainActivity : BlazeBaseActivity() {
             }
         }
 
-        fun showScan(context: Context, text: String) {
-            Intent(context, MainActivity::class.java).apply {
-                putExtra(SCAN, text)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }.run { context.startActivity(this) }
+        fun showFromScan(
+            activity: Activity,
+            scanText: String? = null,
+            userId: String? = null,
+            url: String? = null
+        ) {
+            Intent(activity, MainActivity::class.java).apply {
+                scanText?.let {
+                    putExtra(SCAN, it)
+                }
+                userId?.let {
+                    putExtra(TRANSFER, userId)
+                }
+                url?.let {
+                    putExtra(URL, it)
+                }
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }.run {
+                activity.startActivity(this)
+            }
         }
 
         fun show(context: Context) {
@@ -608,13 +599,21 @@ class MainActivity : BlazeBaseActivity() {
         fun getSingleIntent(context: Context): Intent {
             return Intent(context, MainActivity::class.java).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+        }
+
+        fun getWakeUpIntent(context: Context): Intent {
+            return Intent(context, MainActivity::class.java).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                action = Intent.ACTION_MAIN
             }
         }
 
         fun reopen(context: Context) {
-            return Intent(context, MainActivity::class.java).apply {
-                putExtra(ARGS_RECREATE, true)
+            Intent(context, MainActivity::class.java).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             }.run {
                 context.startActivity(this)
             }

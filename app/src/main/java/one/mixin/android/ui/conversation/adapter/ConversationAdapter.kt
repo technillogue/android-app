@@ -27,6 +27,7 @@ import one.mixin.android.ui.conversation.holder.ActionCardHolder
 import one.mixin.android.ui.conversation.holder.ActionHolder
 import one.mixin.android.ui.conversation.holder.AudioHolder
 import one.mixin.android.ui.conversation.holder.AudioQuoteHolder
+import one.mixin.android.ui.conversation.holder.BaseMentionHolder
 import one.mixin.android.ui.conversation.holder.BaseViewHolder
 import one.mixin.android.ui.conversation.holder.BillHolder
 import one.mixin.android.ui.conversation.holder.CallHolder
@@ -53,6 +54,7 @@ import one.mixin.android.ui.conversation.holder.VideoHolder
 import one.mixin.android.ui.conversation.holder.VideoQuoteHolder
 import one.mixin.android.ui.conversation.holder.WaitingHolder
 import one.mixin.android.util.markdown.MarkwonUtil
+import one.mixin.android.vo.AppCardData
 import one.mixin.android.vo.MessageCategory
 import one.mixin.android.vo.MessageItem
 import one.mixin.android.vo.MessageStatus
@@ -93,12 +95,19 @@ class ConversationAdapter(
     }
 
     private val publisher = PublishSubject.create<PagedList<MessageItem>>()
+    private var pagingList: PagedList<MessageItem>? = null
+
+    fun loadAround(index: Int) {
+        pagingList?.loadAround(index)
+    }
+
     override fun submitList(pagedList: PagedList<MessageItem>?) {
         if (pagedList == null) {
             super.submitList(null)
         } else {
             publisher.onNext(pagedList)
         }
+        this.pagingList = pagedList
     }
 
     fun listen(scopeProvider: ScopeProvider) {
@@ -298,6 +307,7 @@ class ConversationAdapter(
                     (holder as ActionCardHolder).bind(
                         it,
                         isFirst(position),
+                        isLast(position),
                         selectSet.size > 0,
                         isSelect(position),
                         onItemListener
@@ -642,6 +652,9 @@ class ConversationAdapter(
     override fun onViewAttachedToWindow(holder: RecyclerView.ViewHolder) {
         getItem(holder.layoutPosition)?.let {
             (holder as BaseViewHolder).listen(it.messageId)
+            if (holder is BaseMentionHolder) {
+                holder.onViewAttachedToWindow()
+            }
         }
     }
 
@@ -770,7 +783,8 @@ class ConversationAdapter(
                     oldItem.quoteContent == newItem.quoteContent &&
                     oldItem.assetSymbol == newItem.assetSymbol &&
                     oldItem.assetUrl == newItem.assetUrl &&
-                    oldItem.assetIcon == newItem.assetIcon
+                    oldItem.assetIcon == newItem.assetIcon &&
+                    oldItem.mentionRead == newItem.mentionRead
             }
         }
     }
@@ -795,7 +809,7 @@ class ConversationAdapter(
 
         open fun onUserClick(userId: String) {}
 
-        open fun onMentionClick(name: String) {}
+        open fun onMentionClick(identityNumber: String) {}
 
         open fun onUrlClick(url: String) {}
 
@@ -804,6 +818,8 @@ class ConversationAdapter(
         open fun onBlockClick() {}
 
         open fun onActionClick(action: String, userId: String) {}
+
+        open fun onAppCardClick(appCard: AppCardData, userId: String) {}
 
         open fun onAudioClick(messageItem: MessageItem) {}
 
