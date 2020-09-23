@@ -13,6 +13,7 @@ import android.widget.CompoundButton
 import androidx.appcompat.app.AlertDialog
 import androidx.collection.ArraySet
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.uber.autodispose.autoDispose
 import dagger.hilt.android.AndroidEntryPoint
@@ -23,6 +24,8 @@ import kotlinx.android.synthetic.main.fragment_storage.*
 import kotlinx.android.synthetic.main.item_contact_storage.view.*
 import kotlinx.android.synthetic.main.item_storage_check.view.*
 import kotlinx.android.synthetic.main.view_title.view.*
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.launch
 import one.mixin.android.Constants.Storage.AUDIO
 import one.mixin.android.Constants.Storage.DATA
 import one.mixin.android.Constants.Storage.IMAGE
@@ -33,6 +36,8 @@ import one.mixin.android.extension.fileSize
 import one.mixin.android.extension.indeterminateProgressDialog
 import one.mixin.android.extension.toast
 import one.mixin.android.ui.common.BaseFragment
+import one.mixin.android.util.ErrorHandler
+import one.mixin.android.util.ErrorHandler.Companion.errorHandler
 import one.mixin.android.vo.ConversationCategory
 import one.mixin.android.vo.ConversationStorageUsage
 import one.mixin.android.vo.StorageUsage
@@ -62,18 +67,18 @@ class SettingStorageFragment : BaseFragment() {
         title_view.left_ib.setOnClickListener { activity?.onBackPressed() }
         b_rv.adapter = adapter
         menuView.adapter = menuAdapter
-        viewModel.getConversationStorageUsage().autoDispose(stopScope)
-            .subscribe(
-                { list ->
-                    if (progress.visibility != View.GONE) {
-                        progress.visibility = View.GONE
-                    }
-                    adapter.setData(list)
-                },
-                { error ->
-                    Timber.e(error)
-                }
-            )
+
+        lifecycleScope.launch {
+            loadData()
+        }
+    }
+
+    private suspend fun loadData() {
+        val list = viewModel.getConversationStorageUsage()
+        if (progress.visibility != View.GONE) {
+            progress.visibility = View.GONE
+        }
+        adapter.setData(list)
     }
 
     private val dialog: Dialog by lazy {
@@ -145,34 +150,28 @@ class SettingStorageFragment : BaseFragment() {
             }
     }
 
+    private val errorHandler = CoroutineExceptionHandler { _, error ->
+        Timber.e(error)
+        dialog.dismiss()
+        toast(getString(R.string.error_unknown_with_message, selectSet.toString()))
+    }
+
     private fun clear() {
-        dialog.show()
-        Observable.just(selectSet)
-            .observeOn(Schedulers.io()).subscribeOn(Schedulers.io())
-            .map {
-                for (item in selectSet) {
-                    when (item.type) {
-                        IMAGE, VIDEO, AUDIO, DATA -> {
-                            viewModel.clear(item.conversationId, item.type)
-                        }
-                        else -> {
-                            Timber.e("Unknown type")
-                        }
+        lifecycleScope.launch(errorHandler) {
+            dialog.show()
+            for (item in selectSet) {
+                when (item.type) {
+                    IMAGE, VIDEO, AUDIO, DATA -> {
+                        viewModel.clear(item.conversationId, item.type)
+                    }
+                    else -> {
+                        Timber.e("Unknown type")
                     }
                 }
             }
-            .observeOn(AndroidSchedulers.mainThread())
-            .autoDispose(stopScope)
-            .subscribe(
-                {
-                    dialog.dismiss()
-                },
-                {
-                    Timber.e(it)
-                    dialog.dismiss()
-                    toast(getString(R.string.error_unknown_with_message, selectSet.toString()))
-                }
-            )
+            dialog.dismiss()
+            loadData()
+        }
     }
 
     private val menuView: RecyclerView by lazy {

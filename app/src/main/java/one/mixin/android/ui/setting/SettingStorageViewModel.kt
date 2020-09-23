@@ -6,6 +6,8 @@ import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import one.mixin.android.Constants
 import one.mixin.android.Constants.Storage.AUDIO
 import one.mixin.android.Constants.Storage.DATA
@@ -48,9 +50,9 @@ internal constructor(
             result.toList()
         }.subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
 
-    fun getConversationStorageUsage(): Flowable<List<ConversationStorageUsage>> = conversationRepository.getConversationStorageUsage()
-        .map { list ->
-            list.asSequence().map { item ->
+    suspend fun getConversationStorageUsage(): List<ConversationStorageUsage> = withContext(Dispatchers.IO) {
+        conversationRepository.getConversationStorageUsage().asSequence()
+            .map { item ->
                 val context = MixinApplication.appContext
                 item.mediaSize = context.getConversationMediaSize(item.conversationId)
                 item
@@ -59,42 +61,44 @@ internal constructor(
             }.sortedByDescending { conversationStorageUsage ->
                 conversationStorageUsage.mediaSize
             }.toList()
-        }.subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+    }
 
-    fun clear(conversationId: String, type: String) {
+    suspend fun clear(conversationId: String, type: String) {
         if (MixinApplication.appContext.defaultSharedPreferences.getBoolean(Constants.Account.PREF_ATTACHMENT, false)) {
-            when (type) {
-                IMAGE -> {
-                    MixinApplication.get().getConversationImagePath(conversationId)?.deleteRecursively()
-                    conversationRepository.deleteMediaMessageByConversationAndCategory(
-                        conversationId,
-                        MessageCategory.SIGNAL_IMAGE.name,
-                        MessageCategory.PLAIN_IMAGE.name
-                    )
-                }
-                VIDEO -> {
-                    MixinApplication.get().getConversationVideoPath(conversationId)?.deleteRecursively()
-                    conversationRepository.deleteMediaMessageByConversationAndCategory(
-                        conversationId,
-                        MessageCategory.SIGNAL_VIDEO.name,
-                        MessageCategory.PLAIN_VIDEO.name
-                    )
-                }
-                AUDIO -> {
-                    MixinApplication.get().getConversationAudioPath(conversationId)?.deleteRecursively()
-                    conversationRepository.deleteMediaMessageByConversationAndCategory(
-                        conversationId,
-                        MessageCategory.SIGNAL_AUDIO.name,
-                        MessageCategory.PLAIN_AUDIO.name
-                    )
-                }
-                DATA -> {
-                    MixinApplication.get().getConversationDocumentPath(conversationId)?.deleteRecursively()
-                    conversationRepository.deleteMediaMessageByConversationAndCategory(
-                        conversationId,
-                        MessageCategory.SIGNAL_DATA.name,
-                        MessageCategory.PLAIN_DATA.name
-                    )
+            withContext(Dispatchers.IO) {
+                when (type) {
+                    IMAGE -> {
+                        MixinApplication.get().getConversationImagePath(conversationId)?.deleteRecursively()
+                        conversationRepository.deleteMediaMessageByConversationAndCategory(
+                            conversationId,
+                            MessageCategory.SIGNAL_IMAGE.name,
+                            MessageCategory.PLAIN_IMAGE.name
+                        )
+                    }
+                    VIDEO -> {
+                        MixinApplication.get().getConversationVideoPath(conversationId)?.deleteRecursively()
+                        conversationRepository.deleteMediaMessageByConversationAndCategory(
+                            conversationId,
+                            MessageCategory.SIGNAL_VIDEO.name,
+                            MessageCategory.PLAIN_VIDEO.name
+                        )
+                    }
+                    AUDIO -> {
+                        MixinApplication.get().getConversationAudioPath(conversationId)?.deleteRecursively()
+                        conversationRepository.deleteMediaMessageByConversationAndCategory(
+                            conversationId,
+                            MessageCategory.SIGNAL_AUDIO.name,
+                            MessageCategory.PLAIN_AUDIO.name
+                        )
+                    }
+                    DATA -> {
+                        MixinApplication.get().getConversationDocumentPath(conversationId)?.deleteRecursively()
+                        conversationRepository.deleteMediaMessageByConversationAndCategory(
+                            conversationId,
+                            MessageCategory.SIGNAL_DATA.name,
+                            MessageCategory.PLAIN_DATA.name
+                        )
+                    }
                 }
             }
         } else {
@@ -107,7 +111,7 @@ internal constructor(
         }
     }
 
-    private fun clear(conversationId: String, signalCategory: String, plainCategory: String) {
+    private suspend fun clear(conversationId: String, signalCategory: String, plainCategory: String) = withContext(Dispatchers.IO) {
         conversationRepository.getMediaByConversationIdAndCategory(conversationId, signalCategory, plainCategory)
             ?.let { list ->
                 list.forEach { item ->

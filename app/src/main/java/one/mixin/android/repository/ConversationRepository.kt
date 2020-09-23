@@ -239,7 +239,7 @@ internal constructor(
     fun getParticipantsCount(conversationId: String) =
         participantDao.getParticipantsCount(conversationId)
 
-    fun getConversationStorageUsage(): Flowable<List<ConversationStorageUsage>> = readConversationDao.getConversationStorageUsage()
+    suspend fun getConversationStorageUsage(): List<ConversationStorageUsage> = readConversationDao.getConversationStorageUsage()
 
     fun getMediaByConversationIdAndCategory(conversationId: String, signalCategory: String, plainCategory: String) =
         readMessageDao.getMediaByConversationIdAndCategory(conversationId, signalCategory, plainCategory)
