@@ -104,7 +104,7 @@ interface ConversationDao : BaseDao<Conversation> {
     fun observeConversationNameById(conversationId: String): LiveData<String>
 
     @Query("SELECT c.* FROM conversations c WHERE c.conversation_id = :conversationId")
-    fun searchConversationById(conversationId: String): Maybe<Conversation>
+    suspend fun searchConversationById(conversationId: String): Conversation?
 
     @Query("UPDATE conversations SET draft = :text WHERE conversation_id = :conversationId")
     suspend fun saveDraft(conversationId: String, text: String)

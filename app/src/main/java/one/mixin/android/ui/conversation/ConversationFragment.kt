@@ -812,7 +812,7 @@ class ConversationFragment :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registerHeadsetPlugReceiver()
-        recipient = requireArguments().getParcelable<User?>(RECIPIENT)
+        recipient = requireArguments().getParcelable(RECIPIENT)
     }
 
     override fun onCreateView(
@@ -827,55 +827,17 @@ class ConversationFragment :
         super.onViewCreated(view, savedInstanceState)
         val messages = requireArguments().getParcelableArrayList<ForwardMessage>(MESSAGES)
         if (messages != null) {
-            sendForwardMessages(messages)
+            createConversation {
+                initView()
+                sendForwardMessages(messages)
+            }
+            bindData()
         } else {
             initView()
+            bindData()
         }
         AudioPlayer.setStatusListener(this)
-        RxBus.listen(ExitEvent::class.java)
-            .observeOn(AndroidSchedulers.mainThread())
-            .autoDispose(stopScope)
-            .subscribe {
-                if (it.conversationId == conversationId) {
-                    activity?.finish()
-                }
-            }
-        RxBus.listen(ForwardEvent::class.java)
-            .observeOn(AndroidSchedulers.mainThread())
-            .autoDispose(destroyScope)
-            .subscribe { event ->
-                Snackbar.make(chat_rv, getString(R.string.forward_success), Snackbar.LENGTH_LONG)
-                    .setAction(R.string.chat_go_check) {
-                        ConversationActivity.show(requireContext(), event.conversationId, event.userId)
-                    }.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.wallet_blue)).apply {
-                        this.view.setBackgroundResource(R.color.call_btn_icon_checked)
-                        (this.view.findViewById(R.id.snackbar_text) as TextView)
-                            .setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
-                    }.show()
-            }
-
-        RxBus.listen(MentionReadEvent::class.java)
-            .observeOn(AndroidSchedulers.mainThread())
-            .autoDispose(destroyScope)
-            .subscribe { event ->
-                chatViewModel.viewModelScope.launch {
-                    chatViewModel.markMentionRead(event.messageId, event.conversationId)
-                }
-            }
-        RxBus.listen(CallEvent::class.java)
-            .observeOn(AndroidSchedulers.mainThread())
-            .autoDispose(destroyScope)
-            .subscribe { event ->
-                if (event.conversationId == conversationId) {
-                    alertDialogBuilder()
-                        .setMessage(getString(R.string.call_group_full, GROUP_VOICE_MAX_COUNT))
-                        .setNegativeButton(getString(android.R.string.ok)) { dialog, _ ->
-                            dialog.dismiss()
-                        }
-                        .show()
-                }
-            }
-
+        listenEvent()
         checkPeerIfNeeded()
     }
 
@@ -1094,6 +1056,52 @@ class ConversationFragment :
         chatAdapter.markRead()
     }
 
+    private fun listenEvent() {
+        RxBus.listen(ExitEvent::class.java)
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDispose(stopScope)
+            .subscribe {
+                if (it.conversationId == conversationId) {
+                    activity?.finish()
+                }
+            }
+        RxBus.listen(ForwardEvent::class.java)
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDispose(destroyScope)
+            .subscribe { event ->
+                Snackbar.make(chat_rv, getString(R.string.forward_success), Snackbar.LENGTH_LONG)
+                    .setAction(R.string.chat_go_check) {
+                        ConversationActivity.show(requireContext(), event.conversationId, event.userId)
+                    }.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.wallet_blue)).apply {
+                        this.view.setBackgroundResource(R.color.call_btn_icon_checked)
+                        (this.view.findViewById(R.id.snackbar_text) as TextView)
+                            .setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
+                    }.show()
+            }
+
+        RxBus.listen(MentionReadEvent::class.java)
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDispose(destroyScope)
+            .subscribe { event ->
+                chatViewModel.viewModelScope.launch {
+                    chatViewModel.markMentionRead(event.messageId, event.conversationId)
+                }
+            }
+        RxBus.listen(CallEvent::class.java)
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDispose(destroyScope)
+            .subscribe { event ->
+                if (event.conversationId == conversationId) {
+                    alertDialogBuilder()
+                        .setMessage(getString(R.string.call_group_full, GROUP_VOICE_MAX_COUNT))
+                        .setNegativeButton(getString(android.R.string.ok)) { dialog, _ ->
+                            dialog.dismiss()
+                        }
+                        .show()
+                }
+            }
+    }
+
     private var firstPosition = 0
 
     private fun initView() {
@@ -1195,19 +1203,7 @@ class ConversationFragment :
                 flag_layout.bottomCountFlag = false
             }
         }
-        chatViewModel.searchConversationById(conversationId)
-            .autoDispose(stopScope).subscribe(
-                {
-                    it?.draft?.let { str ->
-                        if (isAdded) {
-                            chat_control.chat_et.setText(str)
-                        }
-                    }
-                },
-                {
-                    Timber.e(it)
-                }
-            )
+
         tool_view.close_iv.setOnClickListener { activity?.onBackPressed() }
         tool_view.delete_iv.setOnClickListener {
             chatAdapter.selectSet.filter { it.type.endsWith("_AUDIO") }.forEach {
@@ -1328,7 +1324,6 @@ class ConversationFragment :
                 }
             }
         )
-        bindData()
     }
 
     private fun addSticker(m: MessageItem) = lifecycleScope.launch(Dispatchers.IO) {
@@ -1469,17 +1464,23 @@ class ConversationFragment :
 
     private var unreadCount = 0
     private fun bindData() {
-        unreadCount = requireArguments().getInt(UNREAD_COUNT, 0)
-        liveDataMessage(unreadCount, initialPositionMessageId)
+        lifecycleScope.launch {
+            chatViewModel.searchConversationById(conversationId)?.draft?.let { draft ->
+                if (isAdded) {
+                    chat_control.chat_et.setText(draft)
+                }
+            }
 
-        chatViewModel.getUnreadMentionMessageByConversationId(conversationId).observe(
-            viewLifecycleOwner,
-            { mentionMessages ->
-                flag_layout.mentionCount = mentionMessages.size
-                flag_layout.mention_flag_layout.setOnClickListener {
-                    lifecycleScope.launch {
+            unreadCount = requireArguments().getInt(UNREAD_COUNT, 0)
+            liveDataMessage(unreadCount, initialPositionMessageId)
+
+            chatViewModel.getUnreadMentionMessageByConversationId(conversationId).observe(
+                viewLifecycleOwner,
+                { mentionMessages ->
+                    flag_layout.mentionCount = mentionMessages.size
+                    flag_layout.mention_flag_layout.setOnClickListener {
                         if (mentionMessages.isEmpty()) {
-                            return@launch
+                            return@setOnClickListener
                         }
                         val messageId = mentionMessages.first().messageId
                         scrollToMessage(messageId) {
@@ -1489,16 +1490,16 @@ class ConversationFragment :
                         }
                     }
                 }
-            }
-        )
+            )
 
-        if (isBot) {
-            chatViewModel.updateRecentUsedBots(defaultSharedPreferences, recipient!!.userId)
-            chat_control.showBot()
-        } else {
-            chat_control.hideBot()
+            if (isBot) {
+                chatViewModel.updateRecentUsedBots(defaultSharedPreferences, recipient!!.userId)
+                chat_control.showBot()
+            } else {
+                chat_control.hideBot()
+            }
+            liveDataAppList()
         }
-        liveDataAppList()
     }
 
     private fun liveDataAppList() {
@@ -1513,50 +1514,45 @@ class ConversationFragment :
     private var appList: List<AppItem>? = null
 
     private fun sendForwardMessages(messages: List<ForwardMessage>) {
-        createConversation {
-            initView()
-            messages.let {
-                for (item in it) {
-                    if (item.id != null) {
-                        sendForwardMessage(item.id)
-                    } else {
-                        when (item.type) {
-                            ForwardCategory.CONTACT.name -> {
-                                sendContactMessage(item.sharedUserId!!)
-                            }
-                            ForwardCategory.IMAGE.name -> {
-                                sendImageMessage(Uri.parse(item.mediaUrl), item.mimeType)
-                            }
-                            ForwardCategory.DATA.name -> {
-                                val attachment = context?.getAttachment(Uri.parse(item.mediaUrl))
-                                if (attachment != null) {
-                                    sendAttachmentMessage(attachment)
-                                } else {
-                                    toast(R.string.error_file_exists)
-                                }
-                            }
-                            ForwardCategory.VIDEO.name -> {
-                                sendVideoMessage(Uri.parse(item.mediaUrl))
-                            }
-                            ForwardCategory.TEXT.name -> {
-                                item.content?.let { content -> sendMessage(content) }
-                            }
-                            ForwardCategory.POST.name -> {
-                                item.content?.let { content -> sendPost(content) }
-                            }
-                            ForwardCategory.LOCATION.name -> {
-                                item.content?.let { content ->
-                                    toLocationData(content)?.let { location ->
-                                        sendLocation(location)
-                                    }
-                                }
+        for (item in messages) {
+            if (item.id != null) {
+                sendForwardMessage(item.id)
+            } else {
+                when (item.type) {
+                    ForwardCategory.CONTACT.name -> {
+                        sendContactMessage(item.sharedUserId!!)
+                    }
+                    ForwardCategory.IMAGE.name -> {
+                        sendImageMessage(Uri.parse(item.mediaUrl), item.mimeType)
+                    }
+                    ForwardCategory.DATA.name -> {
+                        val attachment = context?.getAttachment(Uri.parse(item.mediaUrl))
+                        if (attachment != null) {
+                            sendAttachmentMessage(attachment)
+                        } else {
+                            toast(R.string.error_file_exists)
+                        }
+                    }
+                    ForwardCategory.VIDEO.name -> {
+                        sendVideoMessage(Uri.parse(item.mediaUrl))
+                    }
+                    ForwardCategory.TEXT.name -> {
+                        item.content?.let { content -> sendMessage(content) }
+                    }
+                    ForwardCategory.POST.name -> {
+                        item.content?.let { content -> sendPost(content) }
+                    }
+                    ForwardCategory.LOCATION.name -> {
+                        item.content?.let { content ->
+                            toLocationData(content)?.let { location ->
+                                sendLocation(location)
                             }
                         }
                     }
                 }
-                scrollToDown()
             }
         }
+        scrollToDown()
     }
 
     private inline fun createConversation(crossinline action: () -> Unit) {
