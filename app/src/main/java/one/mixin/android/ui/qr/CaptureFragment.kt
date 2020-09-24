@@ -29,7 +29,7 @@ import one.mixin.android.extension.createVideoTemp
 import one.mixin.android.extension.fadeIn
 import one.mixin.android.extension.fadeOut
 import one.mixin.android.extension.getImageCachePath
-import one.mixin.android.extension.getVideoPath
+import one.mixin.android.extension.getLegacyVideoPath
 import one.mixin.android.extension.hasNavigationBar
 import one.mixin.android.extension.inTransaction
 import one.mixin.android.extension.mainThreadDelayed
@@ -191,7 +191,7 @@ class CaptureFragment : BaseCameraxFragment() {
             binding.chronometerLayout.fadeIn()
             binding.chronometer.base = SystemClock.elapsedRealtime()
             binding.chronometer.start()
-            videoFile = requireContext().getVideoPath().createVideoTemp("mp4")
+            videoFile = requireContext().getLegacyVideoPath().createVideoTemp("mp4")
             try {
                 oldStreamVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
                 audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)

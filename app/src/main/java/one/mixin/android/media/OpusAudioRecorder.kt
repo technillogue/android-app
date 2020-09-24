@@ -13,7 +13,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import one.mixin.android.MixinApplication
 import one.mixin.android.extension.createAudioTemp
-import one.mixin.android.extension.getAudioPath
+import one.mixin.android.extension.getLegacyAudioPath
 import one.mixin.android.extension.tapVibrate
 import one.mixin.android.util.DispatchQueue
 import java.io.File
@@ -162,7 +162,7 @@ class OpusAudioRecorder private constructor(private val ctx: Context) {
 
         messageId = UUID.randomUUID().toString()
         if (conversationId == null) throw IllegalArgumentException("Conversation id is NULL!!!")
-        recordingAudioFile = ctx.getAudioPath().createAudioTemp(conversationId!!, messageId!!, "ogg")
+        recordingAudioFile = ctx.getLegacyAudioPath().createAudioTemp(conversationId!!, messageId!!, "ogg")
 
         try {
             if (startRecord(recordingAudioFile!!.absolutePath) != 0) {

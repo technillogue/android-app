@@ -46,6 +46,12 @@ object Constants {
         const val PREF_TRIED_UPDATE_KEY = "pref_tried_update_key"
         const val PREF_DUPLICATE_TRANSFER = "pref_duplicate_transfer"
         const val PREF_RECENT_SEARCH_ASSETS = "pref_recent_search_assets"
+
+        object MediaStore {
+            const val PREF_MEDIA_STORE = "pref_media_store"
+            const val PREF_MEDIA_STORE_LAST = "pref_media_store_last"
+            const val PREF_MEDIA_STORE_OFFSET = "pref_media_store_offset"
+        }
     }
 
     object Scheme {

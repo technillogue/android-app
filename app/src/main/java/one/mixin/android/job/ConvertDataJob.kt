@@ -5,7 +5,7 @@ import com.birbit.android.jobqueue.Params
 import one.mixin.android.MixinApplication
 import one.mixin.android.extension.copyFromInputStream
 import one.mixin.android.extension.createDocumentTemp
-import one.mixin.android.extension.getDocumentPath
+import one.mixin.android.extension.getLegacyDocumentPath
 import one.mixin.android.extension.getExtensionName
 import one.mixin.android.extension.getFilePath
 import one.mixin.android.vo.MediaStatus
@@ -41,7 +41,7 @@ class ConvertDataJob(
         message.mediaUrl?.getFilePath()?.let { _ ->
             val inputStream = MixinApplication.appContext.contentResolver.openInputStream(Uri.parse(message.mediaUrl)) ?: return@let
             val extensionName = message.name?.getExtensionName()
-            val file = MixinApplication.appContext.getDocumentPath().createDocumentTemp(message.conversationId, message.id, extensionName)
+            val file = MixinApplication.appContext.getLegacyDocumentPath().createDocumentTemp(message.conversationId, message.id, extensionName)
             file.copyFromInputStream(inputStream)
             messageDao.updateMediaMessageUrl(Uri.fromFile(file).toString(), message.id)
 

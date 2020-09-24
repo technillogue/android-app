@@ -29,6 +29,7 @@ import one.mixin.android.db.MixinDatabase
 import one.mixin.android.extension.defaultSharedPreferences
 import one.mixin.android.extension.isNightMode
 import one.mixin.android.extension.putBoolean
+import one.mixin.android.extension.putLong
 import one.mixin.android.job.BlazeMessageService
 import one.mixin.android.job.MixinJobManager
 import one.mixin.android.session.Session
@@ -115,6 +116,9 @@ open class MixinApplication :
             Crashes::class.java
         )
 
+        // defaultSharedPreferences.putBoolean(Constants.Account.MediaStore.PREF_MEDIA_STORE, false)
+        // defaultSharedPreferences.putLong(Constants.Account.MediaStore.PREF_MEDIA_STORE_LAST, -1)
+        // defaultSharedPreferences.putLong(Constants.Account.MediaStore.PREF_MEDIA_STORE_OFFSET, 0)
         registerComponentCallbacks(MemoryCallback())
     }
 
