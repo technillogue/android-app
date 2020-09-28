@@ -108,7 +108,8 @@ class SignalProtocol(ctx: Context) {
     }
 
     fun encryptSenderKey(conversationId: String, recipientId: String, deviceId: Int = DEFAULT_DEVICE_ID): EncryptResult {
-        val senderKeyDistributionMessage = getSenderKeyDistribution(conversationId, Session.getAccountId()!!)
+        val accountId = requireNotNull(Session.getAccountId())
+        val senderKeyDistributionMessage = getSenderKeyDistribution(conversationId, accountId)
         return try {
             val cipherMessage = encryptSession(senderKeyDistributionMessage.serialize(), recipientId, deviceId)
             val compose = ComposeMessageData(cipherMessage.type, cipherMessage.serialize())
@@ -196,7 +197,8 @@ class SignalProtocol(ctx: Context) {
         sessionId: String? = null,
         mentionData: List<String>? = null
     ): BlazeMessage {
-        val cipher = encryptSession(message.content!!.toByteArray(), recipientId, sessionId.getDeviceId())
+        val content = requireNotNull(message.content).toByteArray()
+        val cipher = encryptSession(content, recipientId, sessionId.getDeviceId())
         val data = encodeMessageData(ComposeMessageData(cipher.type, cipher.serialize(), resendMessageId))
         val blazeParam = BlazeMessageParam(
             message.conversationId,

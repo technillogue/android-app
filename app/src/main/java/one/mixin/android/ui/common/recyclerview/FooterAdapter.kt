@@ -38,7 +38,7 @@ abstract class FooterAdapter<T> : RecyclerView.Adapter<RecyclerView.ViewHolder>(
         }
     }
 
-    open fun getFootViewHolder() = FootHolder(footerView!!)
+    open fun getFootViewHolder() = FootHolder(requireNotNull(footerView))
     abstract fun getNormalViewHolder(context: Context, parent: ViewGroup): NormalHolder
 
     open class NormalHolder(itemView: View) : RecyclerView.ViewHolder(itemView)

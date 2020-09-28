@@ -31,12 +31,12 @@ class SendProcessSignalKeyJob(
             }
         } else if (action == ProcessSignalKeyAction.REMOVE_PARTICIPANT) {
             Session.getAccountId()?.let {
-                appDatabase.clearParticipant(data.conversationId, participantId!!)
+                appDatabase.clearParticipant(data.conversationId, requireNotNull(participantId))
                 signalProtocol.clearSenderKey(data.conversationId, it)
                 RxBus.publish(SenderKeyChange(data.conversationId))
             }
         } else if (action == ProcessSignalKeyAction.ADD_PARTICIPANT) {
-            val response = userService.fetchSessions(arrayListOf(participantId!!)).execute().body()
+            val response = userService.fetchSessions(arrayListOf(requireNotNull(participantId))).execute().body()
             if (response != null && response.isSuccess) {
                 val ps = response.data?.map { item ->
                     ParticipantSession(data.conversationId, item.userId, item.sessionId)

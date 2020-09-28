@@ -64,7 +64,7 @@ class GalleryItemAdapter(
             }
             imageView.round(ctx.dpToPx(8f))
             coverView.round(ctx.dpToPx(8f))
-            val item = items!![if (needCamera) position - 1 else position]
+            val item = requireNotNull(items)[if (needCamera) position - 1 else position]
             holder.itemView.bg.setBackgroundResource(0)
             if (item.isGif) {
                 holder.itemView.gif_tv.isVisible = true

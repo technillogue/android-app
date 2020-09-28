@@ -188,7 +188,7 @@ class DecryptCallMessage(
                                 val m = createCallMessage(
                                     UUID.randomUUID().toString(),
                                     curData.conversationId,
-                                    Session.getAccountId()!!,
+                                    requireNotNull(Session.getAccountId()),
                                     MessageCategory.WEBRTC_AUDIO_BUSY.name,
                                     null,
                                     nowInUtc(),
@@ -286,7 +286,7 @@ class DecryptCallMessage(
                 listPendingJobMap.remove(data.quoteMessageId)
 
                 val message = createCallMessage(
-                    data.quoteMessageId!!,
+                    requireNotNull(data.quoteMessageId),
                     data.conversationId,
                     data.userId,
                     MessageCategory.WEBRTC_AUDIO_CANCEL.name,

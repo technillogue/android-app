@@ -69,21 +69,21 @@ class MySharedAppsAdapter(
             favoriteApps.notNullWithElse({ it.size }, 0) +
                 unFavoriteApps.notNullWithElse({ it.size }, 0)
             ).run {
-            if (this > 0) {
-                this + 1
-            } else {
-                this
+                if (this > 0) {
+                    this + 1
+                } else {
+                    this
+                }
             }
-        }
     }
 
     fun getItem(position: Int): App {
         val type = getItemViewType(position)
         return if (type == 0) {
-            favoriteApps!![position]
+            requireNotNull(favoriteApps)[position]
         } else {
             val favoriteSize = favoriteApps.notNullWithElse({ it.size }, 0)
-            unFavoriteApps!![position - favoriteSize]
+            requireNotNull(unFavoriteApps)[position - favoriteSize]
         }
     }
 

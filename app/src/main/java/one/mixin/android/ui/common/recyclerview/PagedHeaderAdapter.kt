@@ -56,11 +56,11 @@ abstract class PagedHeaderAdapter<T>(diffCallback: DiffUtil.ItemCallback<T>) :
 
     override fun registerAdapterDataObserver(observer: RecyclerView.AdapterDataObserver) {
         headerObserver = PagedHeaderAdapterDataObserver(observer, if (isShowHeader()) 1 else 0)
-        super.registerAdapterDataObserver(headerObserver!!)
+        super.registerAdapterDataObserver(requireNotNull(headerObserver))
     }
 
     override fun unregisterAdapterDataObserver(observer: RecyclerView.AdapterDataObserver) {
-        super.unregisterAdapterDataObserver(headerObserver!!)
+        super.unregisterAdapterDataObserver(requireNotNull(headerObserver))
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -74,7 +74,7 @@ abstract class PagedHeaderAdapter<T>(diffCallback: DiffUtil.ItemCallback<T>) :
             )
     }
 
-    open fun getHeaderViewHolder(context: Context, parent: ViewGroup) = HeadHolder(headerView!!)
+    open fun getHeaderViewHolder(context: Context, parent: ViewGroup) = HeadHolder(requireNotNull(headerView))
     abstract fun getNormalViewHolder(context: Context, parent: ViewGroup): NormalHolder
 
     open class HeadHolder(itemView: View) : RecyclerView.ViewHolder(itemView)

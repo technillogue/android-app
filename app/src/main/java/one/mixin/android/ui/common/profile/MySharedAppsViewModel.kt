@@ -15,7 +15,7 @@ class MySharedAppsViewModel
         withContext(Dispatchers.IO) {
             val response = accountRepository.addFavoriteApp(appId)
             return@withContext if (response.isSuccess) {
-                accountRepository.insertFavoriteApp(response.data!!)
+                accountRepository.insertFavoriteApp(requireNotNull(response.data))
                 true
             } else {
                 ErrorHandler.handleMixinError(response.errorCode, response.errorDescription)

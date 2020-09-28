@@ -48,7 +48,7 @@ class MySharedAppsFragment : BaseFragment() {
     private fun refresh() {
         lifecycleScope.launch {
             try {
-                mySharedAppsViewModel.refreshFavoriteApps(Session.getAccountId()!!)
+                mySharedAppsViewModel.refreshFavoriteApps(requireNotNull(Session.getAccountId()))
                 loadData()
             } catch (e: Exception) {
                 ErrorHandler.handleError(e)
@@ -59,7 +59,7 @@ class MySharedAppsFragment : BaseFragment() {
     private fun loadData() {
         lifecycleScope.launch {
             val favoriteApps =
-                mySharedAppsViewModel.getFavoriteAppsByUserId(Session.getAccountId()!!)
+                mySharedAppsViewModel.getFavoriteAppsByUserId(requireNotNull(Session.getAccountId()))
             val unFavoriteApps = mySharedAppsViewModel.getUnfavoriteApps()
             recyclerView ?: return@launch
             recyclerView.isVisible = favoriteApps.isNotEmpty() || unFavoriteApps.isNotEmpty()
@@ -89,7 +89,7 @@ class MySharedAppsFragment : BaseFragment() {
                 setCancelable(false)
             }
             try {
-                if (mySharedAppsViewModel.removeFavoriteApp(app.appId, Session.getAccountId()!!)) {
+                if (mySharedAppsViewModel.removeFavoriteApp(app.appId, requireNotNull(Session.getAccountId()))) {
                     loadData()
                 }
             } catch (e: Exception) {

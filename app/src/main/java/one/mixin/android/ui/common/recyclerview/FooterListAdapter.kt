@@ -40,7 +40,7 @@ abstract class FooterListAdapter<T, VH : RecyclerView.ViewHolder>(diffCallback: 
         }
     }
 
-    open fun getFootViewHolder() = FootHolder(footerView!!)
+    open fun getFootViewHolder() = FootHolder(requireNotNull(footerView))
     abstract fun getNormalViewHolder(context: Context, parent: ViewGroup): NormalHolder
 
     open class FootHolder(itemView: View) : RecyclerView.ViewHolder(itemView)

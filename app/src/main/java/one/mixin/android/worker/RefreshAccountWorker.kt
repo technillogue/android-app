@@ -61,7 +61,7 @@ class RefreshAccountWorker @WorkerInject constructor(
             ) {
                 MixinApplication.appContext.defaultSharedPreferences
                     .putInt(SettingConversationFragment.CONVERSATION_GROUP_KEY, MessageSource.EVERYBODY.ordinal)
-            } else if (response.data!!.acceptConversationSource == MessageSource.CONTACTS.name &&
+            } else if (requireNotNull(response.data).acceptConversationSource == MessageSource.CONTACTS.name &&
                 receiveGroup != MessageSource.CONTACTS.ordinal
             ) {
                 MixinApplication.appContext.defaultSharedPreferences

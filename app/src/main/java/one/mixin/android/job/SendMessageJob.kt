@@ -74,12 +74,14 @@ open class SendMessageJob(
     }
 
     private fun recallMessage() {
-        messageDao.recallMessage(recallMessageId!!)
+        messageDao.recallMessage(requireNotNull(recallMessageId) {
+            "Lost recall message id"
+        })
         messageMentionDao.deleteMessage(recallMessageId)
         messageDao.findMessageById(recallMessageId)?.let { msg ->
             RxBus.publish(RecallEvent(msg.id))
             messageDao.recallFailedMessage(msg.id)
-            messageDao.takeUnseen(Session.getAccountId()!!, msg.conversationId)
+            messageDao.takeUnseen(requireNotNull(Session.getAccountId()), msg.conversationId)
             msg.mediaUrl?.getFilePath()?.let {
                 File(it).let { file ->
                     if (file.exists() && file.isFile) {
@@ -127,8 +129,8 @@ open class SendMessageJob(
             message.isCall() ||
             message.category == MessageCategory.APP_CARD.name
         ) {
-            if (message.content != null) {
-                content = message.content!!.base64Encode()
+            message.content?.let {
+                content = it.base64Encode()
             }
         }
         val blazeParam = BlazeMessageParam(

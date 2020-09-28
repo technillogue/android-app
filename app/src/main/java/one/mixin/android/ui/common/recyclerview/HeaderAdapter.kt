@@ -48,7 +48,7 @@ abstract class HeaderAdapter<T> : RecyclerView.Adapter<RecyclerView.ViewHolder>(
         }
     }
 
-    open fun getHeaderViewHolder() = HeadHolder(headerView!!)
+    open fun getHeaderViewHolder() = HeadHolder(requireNotNull(headerView))
     abstract fun getNormalViewHolder(context: Context, parent: ViewGroup): NormalHolder
 
     open class HeadHolder(itemView: View) : RecyclerView.ViewHolder(itemView)

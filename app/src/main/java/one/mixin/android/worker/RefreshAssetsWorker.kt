@@ -23,8 +23,8 @@ class RefreshAssetsWorker @WorkerInject constructor(
         if (assetId != null) {
             val response = assetService.getAssetByIdSuspend(assetId)
             return if (response.isSuccess && response.data != null) {
-                response.data.let {
-                    assetRepo.insert(it!!)
+                response.data?.let {
+                    assetRepo.insert(it)
                 }
                 Result.success()
             } else {

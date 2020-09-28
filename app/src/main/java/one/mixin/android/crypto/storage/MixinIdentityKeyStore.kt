@@ -26,7 +26,7 @@ class MixinIdentityKeyStore(private val context: Context) : IdentityKeyStore {
     }
 
     override fun getLocalRegistrationId(): Int {
-        return dao.getLocalIdentity().registrationId!!
+        return requireNotNull(dao.getLocalIdentity().registrationId)
     }
 
     override fun saveIdentity(address: SignalProtocolAddress, identityKey: IdentityKey): Boolean {

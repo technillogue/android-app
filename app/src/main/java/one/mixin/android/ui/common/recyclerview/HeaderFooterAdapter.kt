@@ -47,6 +47,6 @@ abstract class HeaderFooterAdapter<T> : HeaderAdapter<T>() {
         }
     }
 
-    open fun getFooterViewHolder() = FootHolder(footerView!!)
+    open fun getFooterViewHolder() = FootHolder(requireNotNull(footerView))
     open class FootHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 }

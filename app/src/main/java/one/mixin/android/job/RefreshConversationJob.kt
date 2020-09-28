@@ -35,7 +35,7 @@ class RefreshConversationJob(val conversationId: String) :
                 val participants = mutableListOf<Participant>()
                 val userIdList = mutableListOf<String>()
                 for (p in data.participants) {
-                    val item = Participant(conversationId, p.userId, p.role, p.createdAt!!)
+                    val item = Participant(conversationId, p.userId, p.role, requireNotNull(p.createdAt))
                     if (p.role == ParticipantRole.OWNER.name) {
                         participants.add(0, item)
                     } else {

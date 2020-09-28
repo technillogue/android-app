@@ -48,7 +48,7 @@ class UserTransactionsFragment : BaseTransactionsFragment<PagedList<SnapshotItem
     private val adapter = SnapshotPagedAdapter()
 
     private val userId by lazy {
-        requireArguments().getString(ARGS_USER_ID)!!
+        requireNotNull(requireArguments().getString(ARGS_USER_ID))
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

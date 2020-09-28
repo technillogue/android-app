@@ -1,6 +1,7 @@
 package one.mixin.android.api
 
 import kotlinx.coroutines.withContext
+import one.mixin.android.extension.notNullWithElse
 import one.mixin.android.util.ErrorHandler
 import retrofit2.Response
 import kotlin.coroutines.CoroutineContext
@@ -27,10 +28,10 @@ class MixinResponse<T>() {
         get() = error == null
 
     val errorCode: Int
-        get() = if (error != null) error!!.code else 0
+        get() = error.notNullWithElse({ error -> error.code }, 0)
 
     val errorDescription: String
-        get() = if (error != null) error!!.description else ""
+        get() = error.notNullWithElse({ error -> error.description }, "")
 }
 
 suspend fun <T, R> handleMixinResponse(

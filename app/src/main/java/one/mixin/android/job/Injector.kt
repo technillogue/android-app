@@ -52,54 +52,78 @@ import javax.inject.Inject
 open class Injector {
     @Inject
     lateinit var jobManager: MixinJobManager
+
     @Inject
     @field:[DatabaseCategory(DatabaseCategoryEnum.BASE)]
     lateinit var messageDao: MessageDao
+
     @Inject
     lateinit var messageHistoryDao: MessageHistoryDao
+
     @Inject
     lateinit var userDao: UserDao
+
     @Inject
     lateinit var appDao: AppDao
+
     @Inject
     lateinit var jobDao: JobDao
+
     @Inject
     @field:[DatabaseCategory(DatabaseCategoryEnum.BASE)]
     lateinit var conversationDao: ConversationDao
+
     @Inject
     lateinit var participantDao: ParticipantDao
+
     @Inject
     lateinit var participantSessionDao: ParticipantSessionDao
+
     @Inject
     lateinit var snapshotDao: SnapshotDao
+
     @Inject
     lateinit var assetDao: AssetDao
+
     @Inject
     lateinit var circleDao: CircleDao
+
     @Inject
     lateinit var circleConversationDao: CircleConversationDao
+
     @Inject
     lateinit var traceDao: TraceDao
+
     @Inject
     lateinit var circleService: CircleService
+
     @Inject
     lateinit var chatWebSocket: ChatWebSocket
+
     @Inject
     lateinit var stickerDao: StickerDao
+
     @Inject
     lateinit var messageMentionDao: MessageMentionDao
+
     @Inject
     lateinit var signalProtocol: SignalProtocol
+
     @Inject
     lateinit var ratchetSenderKeyDao: RatchetSenderKeyDao
+
     @Inject
     lateinit var resendMessageDao: ResendSessionMessageDao
+
     @Inject
     lateinit var hyperlinkDao: HyperlinkDao
+
     @Inject
     lateinit var userApi: UserService
+
     @Inject
     lateinit var conversationService: ConversationService
+
     @Inject
     @field:[DatabaseCategory(DatabaseCategoryEnum.BASE)]
     lateinit var database: MixinDatabase
@@ -186,13 +210,16 @@ open class Injector {
                     }
                     var ownerId: String = conversationData.creatorId
                     if (conversationData.category == ConversationCategory.CONTACT.name) {
-                        ownerId = conversationData.participants.find { it.userId != Session.getAccountId() }!!.userId
+                        ownerId = conversationData.participants.find { it.userId != requireNotNull(Session.getAccountId()) }
+                            .let {
+                                requireNotNull(it)
+                            }.userId
                     } else if (conversationData.category == ConversationCategory.GROUP.name) {
                         syncUser(conversationData.creatorId)
                     }
 
                     val remote = conversationData.participants.map {
-                        Participant(conversationId, it.userId, it.role, it.createdAt!!)
+                        Participant(conversationId, it.userId, it.role, requireNotNull(it.createdAt))
                     }
                     participantDao.replaceAll(conversationId, remote)
                     conversationDao.updateConversation(

@@ -81,13 +81,16 @@ class PeerConnectionClient(context: Context, private val events: PeerConnectionE
                                 reportError("createOffer setLocalSdp onSetFailure error: $error")
                             }
                         }
+
                         override fun onSetSuccess() {
                             Timber.d("$TAG_CALL createOffer setLocalSdp onSetSuccess")
                             setLocalSuccess(sdp)
                         }
+
                         override fun onCreateSuccess(sdp: SessionDescription) {
                             Timber.d("$TAG_CALL createOffer setLocalSdp onCreateSuccess")
                         }
+
                         override fun onCreateFailure(error: String?) {
                             if (doWhenSetFailure != null) {
                                 Timber.d("$TAG_CALL createOffer setLocalSdp onCreateFailure error: $error")
@@ -186,13 +189,16 @@ class PeerConnectionClient(context: Context, private val events: PeerConnectionE
                                 reportError("createAnswer setLocalSdp onSetFailure error: $error")
                             }
                         }
+
                         override fun onSetSuccess() {
                             Timber.d("$TAG_CALL createAnswer setLocalSdp onSetSuccess")
                             setLocalSuccess(sdp)
                         }
+
                         override fun onCreateSuccess(sdp: SessionDescription) {
                             Timber.d("$TAG_CALL createAnswer setLocalSdp onCreateSuccess")
                         }
+
                         override fun onCreateFailure(error: String?) {
                             if (doWhenSetFailure != null) {
                                 Timber.d("$TAG_CALL createAnswer setLocalSdp onCreateFailure error: $error")
@@ -233,7 +239,7 @@ class PeerConnectionClient(context: Context, private val events: PeerConnectionE
 
     fun addRemoteIceCandidate(candidate: IceCandidate) {
         Timber.d("$TAG_CALL addRemoteIceCandidate peerConnection: $peerConnection")
-        if (peerConnection != null && peerConnection!!.remoteDescription != null) {
+        if (peerConnection?.remoteDescription != null) {
             peerConnection?.addIceCandidate(candidate)
         } else {
             remoteCandidateCache.add(candidate)
@@ -354,7 +360,8 @@ class PeerConnectionClient(context: Context, private val events: PeerConnectionE
             enableDtlsSrtp = true
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_ONCE
         }
-        val peerConnection = factory!!.createPeerConnection(rtcConfig, pcObserver)
+
+        val peerConnection = requireNotNull(factory).createPeerConnection(rtcConfig, pcObserver)
         if (peerConnection == null) {
             reportError("PeerConnection is not created")
             return null

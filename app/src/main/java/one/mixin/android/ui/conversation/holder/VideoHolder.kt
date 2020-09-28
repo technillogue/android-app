@@ -317,9 +317,7 @@ class VideoHolder constructor(containerView: View) : MediaHolder(containerView) 
                 (itemView.chat_image.layoutParams as ViewGroup.MarginLayoutParams).marginStart = dp6
             }
         }
-        if (dataWidth == null || dataHeight == null ||
-            dataWidth!! <= 0 || dataHeight!! <= 0
-        ) {
+        if (dataWidth.notNullWithElse({ it <= 0 }, true) || dataHeight.notNullWithElse({ it <= 0 }, true)) {
             itemView.chat_image.layoutParams.width = width
             itemView.chat_image.layoutParams.height = width
         } else {
