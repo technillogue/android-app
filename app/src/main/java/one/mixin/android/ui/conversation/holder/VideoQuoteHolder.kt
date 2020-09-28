@@ -79,6 +79,7 @@ class VideoQuoteHolder constructor(containerView: View) : BaseViewHolder(contain
         isFirst: Boolean = false,
         hasSelect: Boolean,
         isSelect: Boolean,
+        isRepresentative: Boolean,
         onItemListener: ConversationAdapter.OnItemListener
     ) {
         this.onItemListener = onItemListener
@@ -114,30 +115,52 @@ class VideoQuoteHolder constructor(containerView: View) : BaseViewHolder(contain
         }
 
         itemView.chat_time.timeAgoClock(messageItem.createdAt)
-        if (messageItem.mediaStatus == MediaStatus.DONE.name) {
-            messageItem.mediaDuration.notNullWithElse(
-                {
-                    itemView.duration_tv.visibility = View.VISIBLE
-                    itemView.duration_tv.text = it.toLongOrNull()?.formatMillis() ?: ""
-                },
-                {
-                    itemView.duration_tv.visibility = View.GONE
-                }
-            )
-        } else {
-            messageItem.mediaSize.notNullWithElse(
-                {
-                    if (it == 0L) {
-                        itemView.duration_tv.visibility = View.GONE
-                    } else {
+        when (messageItem.mediaStatus) {
+            MediaStatus.DONE.name -> {
+                itemView.duration_tv.bindId(null)
+                messageItem.mediaDuration.notNullWithElse(
+                    {
                         itemView.duration_tv.visibility = View.VISIBLE
-                        itemView.duration_tv.text = it.fileSize()
+                        itemView.duration_tv.text = it.toLongOrNull()?.formatMillis() ?: ""
+                    },
+                    {
+                        itemView.duration_tv.visibility = View.GONE
                     }
-                },
-                {
-                    itemView.duration_tv.visibility = View.GONE
-                }
-            )
+                )
+            }
+            MediaStatus.PENDING.name -> {
+                messageItem.mediaSize.notNullWithElse(
+                    {
+                        itemView.duration_tv.visibility = View.VISIBLE
+                        if (it == 0L) {
+                            itemView.duration_tv.bindId(messageItem.messageId)
+                        } else {
+                            itemView.duration_tv.text = it.fileSize()
+                            itemView.duration_tv.bindId(null)
+                        }
+                    },
+                    {
+                        itemView.duration_tv.bindId(null)
+                        itemView.duration_tv.visibility = View.GONE
+                    }
+                )
+            }
+            else -> {
+                messageItem.mediaSize.notNullWithElse(
+                    {
+                        if (it == 0L) {
+                            itemView.duration_tv.visibility = View.GONE
+                        } else {
+                            itemView.duration_tv.visibility = View.VISIBLE
+                            itemView.duration_tv.text = it.fileSize()
+                        }
+                    },
+                    {
+                        itemView.duration_tv.visibility = View.GONE
+                    }
+                )
+                itemView.duration_tv.bindId(null)
+            }
         }
         messageItem.mediaStatus?.let {
             when (it) {
@@ -267,10 +290,11 @@ class VideoQuoteHolder constructor(containerView: View) : BaseViewHolder(contain
         } else {
             itemView.chat_name.setCompoundDrawables(null, null, null, null)
         }
-        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), true) { statusIcon, secretIcon ->
+        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), isRepresentative, true) { statusIcon, secretIcon, representativeIcon ->
             statusIcon?.setBounds(0, 0, dp12, dp12)
             secretIcon?.setBounds(0, 0, dp8, dp8)
-            TextViewCompat.setCompoundDrawablesRelative(itemView.chat_time, secretIcon, null, statusIcon, null)
+            representativeIcon?.setBounds(0, 0, dp8, dp8)
+            TextViewCompat.setCompoundDrawablesRelative(itemView.chat_time, secretIcon ?: representativeIcon, null, statusIcon, null)
         }
 
         val quoteMessage = GsonHelper.customGson.fromJson(messageItem.quoteContent, QuoteMessageItem::class.java)

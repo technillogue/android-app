@@ -27,6 +27,7 @@
     <string name="done">完成</string>
     <string name="forward">转发</string>
     <string name="forward_success">转发成功</string>
+    <string name="message_sent">消息已发送</string>
     <string name="save">保存</string>
     <string name="saving">保存中…</string>
     <string name="pb_dialog_message">请稍等…</string>
@@ -689,6 +690,8 @@
     <string name="live">直播</string>
     <string name="post">文章</string>
     <string name="post_tag">文章</string>
+    <string name="message">消息</string>
+    <string name="card">卡片</string>
     <!--pay-->
     <string name="pay_paid">此付款链接已由某人支付，您无法进行重复付款。</string>
 
@@ -732,6 +735,7 @@
     <string name="action_open">在浏览器中打开</string>
     <string name="action_refresh">刷新</string>
     <string name="action_update">升级</string>
+    <string name="action_reload">重新载入</string>
     <string name="slide_to_cancel">滑动取消</string>
     <string name="gallery_all">全部</string>
     <string name="gallery_empty_text">还没有图片或视频</string>
@@ -874,4 +878,11 @@
     <string name="bot_internal_camera">相机</string>
     <string name="bot_internal_wallet">钱包</string>
     <string name="bot_empty_tip">可以添加你喜欢的机器人</string>
+    <!-- share -->
+    <string name="share_message_description">你确定要发送来自%1$s的%2$s？</string>
+    <string name="share_message_description_empty">你确定要发送该%1$s？</string>
+    <!-- web -->
+    <string name="web_cannot_reached_title">无法访问此网页</string>
+    <string name="web_cannot_reached_desc">无法访问 %1$s，请检查你的网络并尝试切换 4G、Wi-Fi 或 VPN 后重新载入页面。</string>
+    <string name="web_contact_developer">联系开发者</string>
 </resources>

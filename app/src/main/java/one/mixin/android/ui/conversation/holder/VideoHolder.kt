@@ -48,6 +48,7 @@ class VideoHolder constructor(containerView: View) : MediaHolder(containerView) 
         isFirst: Boolean,
         hasSelect: Boolean,
         isSelect: Boolean,
+        isRepresentative: Boolean,
         onItemListener: ConversationAdapter.OnItemListener
     ) {
         if (hasSelect && isSelect) {
@@ -111,30 +112,52 @@ class VideoHolder constructor(containerView: View) : MediaHolder(containerView) 
             }
         } else {
             itemView.live_tv.visibility = GONE
-            if (messageItem.mediaStatus == MediaStatus.DONE.name) {
-                messageItem.mediaDuration.notNullWithElse(
-                    {
-                        itemView.duration_tv.visibility = VISIBLE
-                        itemView.duration_tv.text = it.toLongOrNull()?.formatMillis() ?: ""
-                    },
-                    {
-                        itemView.duration_tv.visibility = GONE
-                    }
-                )
-            } else {
-                messageItem.mediaSize.notNullWithElse(
-                    {
-                        if (it == 0L) {
-                            itemView.duration_tv.visibility = GONE
-                        } else {
+            when (messageItem.mediaStatus) {
+                MediaStatus.DONE.name -> {
+                    itemView.duration_tv.bindId(null)
+                    messageItem.mediaDuration.notNullWithElse(
+                        {
                             itemView.duration_tv.visibility = VISIBLE
-                            itemView.duration_tv.text = it.fileSize()
+                            itemView.duration_tv.text = it.toLongOrNull()?.formatMillis() ?: ""
+                        },
+                        {
+                            itemView.duration_tv.visibility = GONE
                         }
-                    },
-                    {
-                        itemView.duration_tv.visibility = GONE
-                    }
-                )
+                    )
+                }
+                MediaStatus.PENDING.name -> {
+                    messageItem.mediaSize.notNullWithElse(
+                        {
+                            itemView.duration_tv.visibility = VISIBLE
+                            if (it == 0L) {
+                                itemView.duration_tv.bindId(messageItem.messageId)
+                            } else {
+                                itemView.duration_tv.text = it.fileSize()
+                                itemView.duration_tv.bindId(null)
+                            }
+                        },
+                        {
+                            itemView.duration_tv.bindId(null)
+                            itemView.duration_tv.visibility = GONE
+                        }
+                    )
+                }
+                else -> {
+                    messageItem.mediaSize.notNullWithElse(
+                        {
+                            if (it == 0L) {
+                                itemView.duration_tv.visibility = GONE
+                            } else {
+                                itemView.duration_tv.visibility = VISIBLE
+                                itemView.duration_tv.text = it.fileSize()
+                            }
+                        },
+                        {
+                            itemView.duration_tv.visibility = GONE
+                        }
+                    )
+                    itemView.duration_tv.bindId(null)
+                }
             }
             messageItem.mediaStatus?.let {
                 when (it) {
@@ -237,10 +260,11 @@ class VideoHolder constructor(containerView: View) : MediaHolder(containerView) 
         }
         itemView.chat_time.timeAgoClock(messageItem.createdAt)
 
-        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), true) { statusIcon, secretIcon ->
+        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), isRepresentative, true) { statusIcon, secretIcon, representativeIcon ->
             statusIcon?.setBounds(0, 0, dp12, dp12)
             secretIcon?.setBounds(0, 0, dp8, dp8)
-            TextViewCompat.setCompoundDrawablesRelative(itemView.chat_time, secretIcon, null, statusIcon, null)
+            representativeIcon?.setBounds(0, 0, dp8, dp8)
+            TextViewCompat.setCompoundDrawablesRelative(itemView.chat_time, secretIcon ?: representativeIcon, null, statusIcon, null)
         }
 
         dataWidth = messageItem.mediaWidth

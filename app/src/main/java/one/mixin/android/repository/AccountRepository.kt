@@ -16,6 +16,7 @@ import one.mixin.android.api.request.LogoutRequest
 import one.mixin.android.api.request.PinRequest
 import one.mixin.android.api.request.RawTransactionsRequest
 import one.mixin.android.api.request.SessionRequest
+import one.mixin.android.api.request.SessionSecretRequest
 import one.mixin.android.api.request.StickerAddRequest
 import one.mixin.android.api.request.VerificationRequest
 import one.mixin.android.api.response.AuthorizationResponse
@@ -38,9 +39,9 @@ import one.mixin.android.db.UserDao
 import one.mixin.android.db.insertUpdate
 import one.mixin.android.db.insertUpdateList
 import one.mixin.android.extension.within24Hours
+import one.mixin.android.session.Session
+import one.mixin.android.session.encryptPin
 import one.mixin.android.util.ErrorHandler
-import one.mixin.android.util.Session
-import one.mixin.android.util.encryptPin
 import one.mixin.android.vo.Account
 import one.mixin.android.vo.FavoriteApp
 import one.mixin.android.vo.Sticker
@@ -251,4 +252,6 @@ constructor(
             }
         }
     }
+
+    suspend fun modifySessionSecret(request: SessionSecretRequest) = accountService.modifySessionSecret(request)
 }

@@ -20,9 +20,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.fragment_new_group.*
 import kotlinx.android.synthetic.main.item_contact_normal.view.*
 import kotlinx.android.synthetic.main.view_title.view.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import one.mixin.android.R
 import one.mixin.android.extension.createImageTemp
 import one.mixin.android.extension.getOtherPath
@@ -33,10 +31,10 @@ import one.mixin.android.extension.openPermissionSetting
 import one.mixin.android.extension.showKeyboard
 import one.mixin.android.extension.toBytes
 import one.mixin.android.extension.withArgs
+import one.mixin.android.session.Session
 import one.mixin.android.ui.common.BaseFragment
 import one.mixin.android.ui.conversation.ConversationActivity
 import one.mixin.android.ui.home.MainActivity
-import one.mixin.android.util.Session
 import one.mixin.android.vo.ConversationStatus
 import one.mixin.android.vo.User
 import one.mixin.android.vo.toUser
@@ -124,15 +122,13 @@ class NewGroupFragment : BaseFragment() {
             val bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, resultUri)
             Base64.encodeToString(bitmap.toBytes(), Base64.NO_WRAP)
         }
-        val conversation = withContext(Dispatchers.IO) {
-            groupViewModel.createGroupConversation(
-                name_desc_et.text.toString(),
-                notice_desc_et.text.toString(),
-                groupIcon,
-                adapter.users!!,
-                sender
-            )
-        }
+        val conversation = groupViewModel.createGroupConversation(
+            name_desc_et.text.toString(),
+            notice_desc_et.text.toString(),
+            groupIcon,
+            adapter.users!!,
+            sender
+        )
         val liveData = groupViewModel.getConversationStatusById(conversation.conversationId)
         liveData.observe(
             viewLifecycleOwner,

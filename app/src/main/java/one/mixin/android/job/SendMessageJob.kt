@@ -7,19 +7,12 @@ import one.mixin.android.event.RecallEvent
 import one.mixin.android.extension.base64Encode
 import one.mixin.android.extension.findLastUrl
 import one.mixin.android.extension.getFilePath
+import one.mixin.android.session.Session
 import one.mixin.android.util.GsonHelper
 import one.mixin.android.util.MessageFts4Helper
-import one.mixin.android.util.Session
 import one.mixin.android.util.hyperlink.parsHyperlink
 import one.mixin.android.util.mention.parseMentionData
-import one.mixin.android.vo.MentionUser
-import one.mixin.android.vo.Message
-import one.mixin.android.vo.MessageCategory
-import one.mixin.android.vo.isCall
-import one.mixin.android.vo.isKraken
-import one.mixin.android.vo.isPlain
-import one.mixin.android.vo.isRecall
-import one.mixin.android.vo.isText
+import one.mixin.android.vo.*
 import one.mixin.android.websocket.BlazeMessage
 import one.mixin.android.websocket.BlazeMessageParam
 import one.mixin.android.websocket.KrakenParam
@@ -73,7 +66,7 @@ open class SendMessageJob(
                 }
 
                 messageDao.insert(message)
-                MessageFts4Helper.insertOrReplaceMessageFts4(message)
+                MessageFts4Helper.insertOrReplaceMessageFts4(message, message.name)
             }
         } else {
             Bugsnag.notify(Throwable("Insert failed, no conversation $alreadyExistMessage"))

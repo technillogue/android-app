@@ -35,6 +35,7 @@ import android.view.KeyEvent
 import android.view.ViewConfiguration
 import android.view.Window
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -695,6 +696,8 @@ fun Context.isLandscape() = resources.configuration.orientation == Configuration
 fun Context.isAutoRotate() = Settings.System.getInt(contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
 
 fun Fragment.toast(textResource: Int) = requireActivity().toast(textResource)
+
+fun Fragment.toastShort(textResource: Int) = requireActivity().toast(textResource, Toast.LENGTH_SHORT)
 
 fun Fragment.toast(text: CharSequence) = requireActivity().toast(text)
 

@@ -36,10 +36,10 @@ import one.mixin.android.extension.nowInUtc
 import one.mixin.android.extension.postOptimize
 import one.mixin.android.extension.putString
 import one.mixin.android.job.BaseJob.Companion.PRIORITY_SEND_ATTACHMENT_MESSAGE
+import one.mixin.android.session.Session
 import one.mixin.android.util.ColorUtil
 import one.mixin.android.util.GsonHelper
 import one.mixin.android.util.MessageFts4Helper
-import one.mixin.android.util.Session
 import one.mixin.android.util.hyperlink.parsHyperlink
 import one.mixin.android.util.mention.parseMentionData
 import one.mixin.android.vo.AppButtonData
@@ -581,15 +581,19 @@ class DecryptMessage : Injector() {
             data.category.endsWith("_CONTACT") -> {
                 val decoded = Base64.decode(plainText)
                 val contactData = gson.fromJson(String(decoded), ContactMessagePayload::class.java)
+                val user = syncUser(contactData.userId)
                 val message = generateMessage(data) { quoteMessageItem ->
                     createContactMessage(
                         data.messageId, data.conversationId, data.userId, data.category,
-                        plainText, contactData.userId, data.status, data.createdAt,
+                        plainText, contactData.userId, data.status, data.createdAt, user?.fullName,
                         quoteMessageItem?.messageId, quoteMessageItem.toJson()
                     )
                 }
                 database.insertAndNotifyConversation(message)
-                syncUser(contactData.userId)
+                val fullName = user?.fullName
+                if (!fullName.isNullOrBlank()) {
+                    MessageFts4Helper.insertOrReplaceMessageFts4(message, fullName)
+                }
                 sendNotificationJob(message, data.source)
             }
             data.category.endsWith("_LIVE") -> {

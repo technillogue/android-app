@@ -200,6 +200,9 @@ fun Message.isFtsMessage() =
 fun Message.isData() =
     category == MessageCategory.PLAIN_DATA.name || category == MessageCategory.SIGNAL_DATA.name
 
+fun Message.isContact() =
+    category == MessageCategory.PLAIN_CONTACT.name || category == MessageCategory.SIGNAL_CONTACT.name
+
 enum class MessageCategory {
     SIGNAL_KEY,
     SIGNAL_TEXT,
@@ -305,6 +308,17 @@ fun createAppCardMessage(
     createdAt: String,
     status: String
 ) = MessageBuilder(messageId, conversationId, userId, MessageCategory.APP_CARD.name, status, createdAt)
+    .setContent(content)
+    .build()
+
+fun createAppButtonGroupMessage(
+    messageId: String,
+    conversationId: String,
+    userId: String,
+    content: String,
+    createdAt: String,
+    status: String
+) = MessageBuilder(messageId, conversationId, userId, MessageCategory.APP_BUTTON_GROUP.name, status, createdAt)
     .setContent(content)
     .build()
 
@@ -511,10 +525,12 @@ fun createContactMessage(
     sharedUserId: String,
     status: String,
     createdAt: String,
+    name: String? = null,
     quoteMessageId: String? = null,
     quoteContent: String? = null
 ) = MessageBuilder(messageId, conversationId, userId, category, status, createdAt)
     .setContent(content)
+    .setName(name)
     .setSharedUserId(sharedUserId)
     .setQuoteMessageId(quoteMessageId)
     .setQuoteContent(quoteContent)

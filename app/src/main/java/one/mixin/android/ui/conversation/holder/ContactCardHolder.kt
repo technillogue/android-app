@@ -9,8 +9,8 @@ import kotlinx.android.synthetic.main.date_wrapper.view.*
 import kotlinx.android.synthetic.main.item_chat_contact_card.view.*
 import one.mixin.android.R
 import one.mixin.android.extension.timeAgoClock
+import one.mixin.android.session.Session
 import one.mixin.android.ui.conversation.adapter.ConversationAdapter
-import one.mixin.android.util.Session
 import one.mixin.android.vo.MessageItem
 import one.mixin.android.vo.isSignal
 import one.mixin.android.vo.showVerifiedOrBot
@@ -24,6 +24,7 @@ class ContactCardHolder(containerView: View) : BaseViewHolder(containerView) {
         isLast: Boolean,
         hasSelect: Boolean,
         isSelect: Boolean,
+        isRepresentative: Boolean,
         onItemListener: ConversationAdapter.OnItemListener
     ) {
         if (hasSelect && isSelect) {
@@ -58,10 +59,11 @@ class ContactCardHolder(containerView: View) : BaseViewHolder(containerView) {
             itemView.chat_name.visibility = View.GONE
         }
 
-        setStatusIcon(isMe, messageItem.status, messageItem.isSignal()) { statusIcon, secretIcon ->
+        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), isRepresentative) { statusIcon, secretIcon, representativeIcon ->
             itemView.chat_flag.isVisible = statusIcon != null
             itemView.chat_flag.setImageDrawable(statusIcon)
             itemView.chat_secret.isVisible = secretIcon != null
+            itemView.chat_representative.isVisible = representativeIcon != null
         }
         chatLayout(isMe, isLast)
 
