@@ -7,11 +7,13 @@ import one.mixin.android.Constants
 import one.mixin.android.R
 import one.mixin.android.databinding.FragmentAboutBinding
 import one.mixin.android.extension.defaultSharedPreferences
+import one.mixin.android.extension.navTo
 import one.mixin.android.extension.openMarket
 import one.mixin.android.extension.openUrl
 import one.mixin.android.extension.putBoolean
 import one.mixin.android.extension.toast
 import one.mixin.android.ui.common.BaseFragment
+import one.mixin.android.ui.setting.diagnosis.DiagnosisFragment
 import one.mixin.android.util.viewBinding
 import one.mixin.android.widget.DebugClickListener
 
@@ -31,6 +33,13 @@ class AboutFragment : BaseFragment(R.layout.fragment_about) {
         binding.apply {
             titleView.setSubTitle(getString(R.string.app_name), getString(R.string.about_version, versionName))
             titleView.leftIb.setOnClickListener { activity?.onBackPressed() }
+            titleView.titleLayout.setOnClickListener(object : DebugClickListener() {
+                override fun onDebugClick() {
+                    navTo(DiagnosisFragment.newInstance(), DiagnosisFragment.TAG)
+                }
+
+                override fun onSingleClick() {}
+            })
             imageView.setOnClickListener(object : DebugClickListener() {
                 override fun onDebugClick() {
                     if (defaultSharedPreferences.getBoolean(Constants.Debug.WEB_DEBUG, false)) {
