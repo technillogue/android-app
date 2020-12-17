@@ -85,11 +85,30 @@ public abstract class MixinLimitOffsetDataSource<T> extends PositionalDataSource
             return;
         }
 
-        // bound the size requested, based on known count
-        final int firstLoadPosition = computeInitialLoadPosition(params, totalCount);
-        final int firstLoadSize = computeInitialLoadSize(params, firstLoadPosition, totalCount);
+        int firstLoadPosition;
+        int firstLoadSize;
+        RoomSQLiteQuery sqLiteQuery = null;
+        Cursor cursor = null;
+        List<T> list;
+        try {
+            // bound the size requested, based on known count
+            firstLoadPosition = computeInitialLoadPosition(params, totalCount);
+            firstLoadSize = computeInitialLoadSize(params, firstLoadPosition, totalCount);
 
-        List<T> list = loadRange(firstLoadPosition, firstLoadSize);
+            sqLiteQuery = getSQLiteQuery(firstLoadPosition, firstLoadSize);
+            cursor = mDb.query(sqLiteQuery);
+            List<T> rows = convertRows(cursor);
+            list = rows;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+            if (sqLiteQuery != null) {
+                sqLiteQuery.release();
+            }
+        }
+
+
         if (list != null && list.size() == firstLoadSize) {
             callback.onResult(list, firstLoadPosition, totalCount);
         } else {
@@ -114,14 +133,11 @@ public abstract class MixinLimitOffsetDataSource<T> extends PositionalDataSource
      */
     @Nullable
     public List<T> loadRange(int startPosition, int loadCount) {
-        final RoomSQLiteQuery sqLiteQuery = RoomSQLiteQuery.acquire(mLimitOffsetQuery,
-                mSourceQuery.getArgCount() + 2);
-        sqLiteQuery.copyArgumentsFrom(mSourceQuery);
-        sqLiteQuery.bindLong(sqLiteQuery.getArgCount() - 1, loadCount);
-        sqLiteQuery.bindLong(sqLiteQuery.getArgCount(), startPosition);
+        final RoomSQLiteQuery sqLiteQuery = getSQLiteQuery(startPosition, loadCount);
         if (mInTransaction) {
             mDb.beginTransaction();
             Cursor cursor = null;
+            //noinspection TryFinallyCanBeTryWithResources
             try {
                 cursor = mDb.query(sqLiteQuery);
                 List<T> rows = convertRows(cursor);
@@ -144,5 +160,14 @@ public abstract class MixinLimitOffsetDataSource<T> extends PositionalDataSource
                 sqLiteQuery.release();
             }
         }
+    }
+
+    private RoomSQLiteQuery getSQLiteQuery(int startPosition, int loadCount) {
+        final RoomSQLiteQuery sqLiteQuery = RoomSQLiteQuery.acquire(mLimitOffsetQuery,
+                mSourceQuery.getArgCount() + 2);
+        sqLiteQuery.copyArgumentsFrom(mSourceQuery);
+        sqLiteQuery.bindLong(sqLiteQuery.getArgCount() - 1, loadCount);
+        sqLiteQuery.bindLong(sqLiteQuery.getArgCount(), startPosition);
+        return sqLiteQuery;
     }
 }
