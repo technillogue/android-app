@@ -151,7 +151,7 @@ data class MessageItem(
             unfinishedAttachment() ||
             isCallMessage() || isRecall() || isGroupCall()
 
-    fun unfinishedAttachment(): Boolean = !mediaDownloaded(this.mediaStatus) && (isData() || isImage() || isVideo() || isAudio())
+    private fun unfinishedAttachment(): Boolean = !mediaDownloaded(this.mediaStatus) && isAttachment()
 }
 
 fun create(type: String, createdAt: String? = null) = MessageItem(
