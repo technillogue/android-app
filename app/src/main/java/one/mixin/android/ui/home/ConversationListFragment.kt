@@ -485,7 +485,7 @@ class ConversationListFragment : LinkFragment() {
                 }
                 messageAdapter.setShowHeader(true, binding.messageRv)
             } else {
-                messageAdapter.setShowHeader(false, binding.messageRv)
+                if (!displayVersion) messageAdapter.setShowHeader(false, binding.messageRv)
                 if (!requireContext().isPlayStoreInstalled()) {
                     messagesViewModel.latest()?.let { latest ->
                         if (latest.hasNewVersion() && requireContext().defaultSharedPreferences.getInt(
@@ -509,6 +509,9 @@ class ConversationListFragment : LinkFragment() {
                                 requireContext().openMarket()
                             }
                             messageAdapter.setShowHeader(true, binding.messageRv)
+                        } else {
+                            displayVersion = false
+                            messageAdapter.setShowHeader(false, binding.messageRv)
                         }
                     }
                 }
