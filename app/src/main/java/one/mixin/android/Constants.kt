@@ -49,6 +49,7 @@ object Constants {
         const val PREF_DUPLICATE_TRANSFER = "pref_duplicate_transfer"
         const val PREF_STRANGER_TRANSFER = "pref_stranger_transfer"
         const val PREF_RECENT_SEARCH_ASSETS = "pref_recent_search_assets"
+        const val PREF_INCOGNITO_KEYBOARD = "pref_incognito_keyboard"
     }
 
     object Scheme {
@@ -75,7 +76,7 @@ object Constants {
     object DataBase {
         const val DB_NAME = "mixin.db"
         const val MINI_VERSION = 15
-        const val CURRENT_VERSION = 35
+        const val CURRENT_VERSION = 36
     }
 
     object Storage {
@@ -140,6 +141,8 @@ object Constants {
 
     object Debug {
         const val WEB_DEBUG = "web_debug"
+        const val DB_DEBUG = "db_debug"
+        const val DB_DEBUG_WARNING = "db_debug_warning"
     }
 
     const val SLEEP_MILLIS: Long = 1000

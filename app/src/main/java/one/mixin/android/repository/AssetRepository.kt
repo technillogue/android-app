@@ -24,6 +24,7 @@ import one.mixin.android.vo.Address
 import one.mixin.android.vo.Asset
 import one.mixin.android.vo.AssetItem
 import one.mixin.android.vo.AssetsExtra
+import one.mixin.android.vo.PriceAndChange
 import one.mixin.android.vo.Snapshot
 import one.mixin.android.vo.SnapshotItem
 import one.mixin.android.vo.Trace
@@ -256,4 +257,10 @@ constructor(
     suspend fun suspendDeleteTraceById(traceId: String) = traceDao.suspendDeleteById(traceId)
 
     suspend fun ticker(assetId: String, offset: String?) = assetService.ticker(assetId, offset)
+
+    suspend fun findSnapshotByTransactionHashList(assetId: String, hashList: List<String>): List<String> =
+        snapshotDao.findSnapshotIdsByTransactionHashList(assetId, hashList)
+
+    suspend fun suspendUpdatePrices(priceAndChange: List<PriceAndChange>) =
+        assetDao.suspendUpdatePrices(priceAndChange)
 }

@@ -2,6 +2,8 @@ package one.mixin.android.db
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.database.Cursor
+import android.util.ArrayMap
 import androidx.arch.core.executor.ArchTaskExecutor
 import androidx.room.Database
 import androidx.room.Room
@@ -32,6 +34,9 @@ import one.mixin.android.db.MixinDatabaseMigrations.Companion.MIGRATION_31_32
 import one.mixin.android.db.MixinDatabaseMigrations.Companion.MIGRATION_32_33
 import one.mixin.android.db.MixinDatabaseMigrations.Companion.MIGRATION_33_34
 import one.mixin.android.db.MixinDatabaseMigrations.Companion.MIGRATION_34_35
+import one.mixin.android.db.MixinDatabaseMigrations.Companion.MIGRATION_35_36
+import one.mixin.android.util.GsonHelper
+import one.mixin.android.util.debug.getContent
 import one.mixin.android.vo.Address
 import one.mixin.android.vo.App
 import one.mixin.android.vo.Asset
@@ -135,9 +140,9 @@ abstract class MixinDatabase : RoomDatabase() {
                 if (INSTANCE == null) {
                     val builder = Room.databaseBuilder(context, MixinDatabase::class.java, DB_NAME)
                         .addMigrations(
-                            MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-                            MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
-                            MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35
+                            MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
+                            MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
+                            MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36,
                         )
                         .enableMultiInstanceInvalidation()
                         .addCallback(CALLBACK)
@@ -155,6 +160,29 @@ abstract class MixinDatabase : RoomDatabase() {
             }
         }
 
+        fun query(query: String): String? {
+            val start = System.currentTimeMillis()
+            var cursor: Cursor? = null
+            try {
+                cursor =
+                    supportSQLiteDatabase?.query(query) ?: return null
+                cursor.moveToFirst()
+                val result = ArrayList<ArrayMap<String, String>>()
+                do {
+                    val map = ArrayMap<String, String>()
+                    for (i in 0 until cursor.columnCount) {
+                        map[cursor.getColumnName(i)] = cursor.getContent(i)
+                    }
+                    result.add(map)
+                } while (cursor.moveToNext())
+                return "${GsonHelper.customGson.toJson(result)} ${System.currentTimeMillis() - start}ms"
+            } catch (e: Exception) {
+                return e.message
+            } finally {
+                cursor?.close()
+            }
+        }
+
         fun checkPoint() {
             supportSQLiteDatabase?.query("PRAGMA wal_checkpoint(FULL)")?.close()
         }
@@ -163,7 +191,7 @@ abstract class MixinDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 db.execSQL(
-                    "CREATE TRIGGER IF NOT EXISTS conversation_last_message_update AFTER INSERT ON messages BEGIN UPDATE conversations SET last_message_id = new.id WHERE conversation_id = new.conversation_id; END"
+                    "CREATE TRIGGER IF NOT EXISTS conversation_last_message_update AFTER INSERT ON messages BEGIN UPDATE conversations SET last_message_id = new.id, last_message_created_at = new.created_at WHERE conversation_id = new.conversation_id; END"
                 )
                 db.execSQL(
                     "CREATE TRIGGER IF NOT EXISTS conversation_last_message_delete AFTER DELETE ON messages BEGIN UPDATE conversations SET last_message_id = (select id from messages where conversation_id = old.conversation_id order by created_at DESC limit 1) WHERE conversation_id = old.conversation_id; END"
@@ -174,7 +202,7 @@ abstract class MixinDatabase : RoomDatabase() {
                 super.onOpen(db)
                 supportSQLiteDatabase = db
                 db.execSQL(
-                    "CREATE TRIGGER IF NOT EXISTS conversation_last_message_update AFTER INSERT ON messages BEGIN UPDATE conversations SET last_message_id = new.id WHERE conversation_id = new.conversation_id; END"
+                    "CREATE TRIGGER IF NOT EXISTS conversation_last_message_update AFTER INSERT ON messages BEGIN UPDATE conversations SET last_message_id = new.id, last_message_created_at = new.created_at  WHERE conversation_id = new.conversation_id; END"
                 )
                 db.execSQL(
                     "CREATE TRIGGER IF NOT EXISTS conversation_last_message_delete AFTER DELETE ON messages BEGIN UPDATE conversations SET last_message_id = (select id from messages where conversation_id = old.conversation_id order by created_at DESC limit 1) WHERE conversation_id = old.conversation_id; END"

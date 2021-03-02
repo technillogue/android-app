@@ -52,7 +52,7 @@ interface MessageDao : BaseDao<Message> {
     fun getMessages(conversationId: String): DataSource.Factory<Int, MessageItem>
 
     @Query(
-        """SELECT count(*) FROM messages WHERE conversation_id = :conversationId
+        """SELECT count(1) FROM messages WHERE conversation_id = :conversationId
             AND rowid > (SELECT rowid FROM messages WHERE id = :messageId)"""
     )
     suspend fun findMessageIndex(conversationId: String, messageId: String): Int
@@ -88,7 +88,7 @@ interface MessageDao : BaseDao<Message> {
 
     @Query(
         """
-            SELECT count(*) FROM messages WHERE conversation_id = :conversationId
+            SELECT count(1) FROM messages WHERE conversation_id = :conversationId
             AND created_at < (SELECT created_at FROM messages WHERE id = :messageId)
             AND category IN ('SIGNAL_IMAGE','PLAIN_IMAGE', 'SIGNAL_VIDEO', 'PLAIN_VIDEO', 'SIGNAL_LIVE', 'PLAIN_LIVE') 
             ORDER BY created_at ASC, rowid ASC
@@ -113,7 +113,7 @@ interface MessageDao : BaseDao<Message> {
     fun getMediaMessagesExcludeLive(conversationId: String): DataSource.Factory<Int, MessageItem>
 
     @Query(
-        """SELECT count(*) FROM messages WHERE conversation_id = :conversationId 
+        """SELECT count(1) FROM messages WHERE conversation_id = :conversationId 
         AND created_at > (SELECT created_at FROM messages WHERE id = :messageId)
         AND category IN ('SIGNAL_IMAGE', 'PLAIN_IMAGE', 'SIGNAL_VIDEO', 'PLAIN_VIDEO')
         ORDER BY created_at DESC, rowid DESC
@@ -211,10 +211,10 @@ interface MessageDao : BaseDao<Message> {
             SELECT m.conversation_id AS conversationId, c.icon_url AS conversationAvatarUrl,
             c.name AS conversationName, c.category AS conversationCategory, count(m.id) as messageCount,
             u.user_id AS userId, u.avatar_url AS userAvatarUrl, u.full_name AS userFullName
-            FROM messages m
+            FROM messages m, (SELECT message_id FROM messages_fts4 WHERE messages_fts4 MATCH :query) fts
 			INNER JOIN users u ON c.owner_id = u.user_id
             INNER JOIN conversations c ON c.conversation_id = m.conversation_id
-            WHERE m.id in (SELECT message_id FROM messages_fts4 WHERE messages_fts4 MATCH :query) 
+            WHERE m.id = fts.message_id
             GROUP BY m.conversation_id
             ORDER BY max(m.created_at) DESC
             LIMIT :limit
@@ -226,8 +226,9 @@ interface MessageDao : BaseDao<Message> {
         """
             SELECT m.id AS messageId, u.user_id AS userId, u.avatar_url AS userAvatarUrl, u.full_name AS userFullName,
             m.category AS type, m.content AS content, m.created_at AS createdAt, m.name AS mediaName 
-            FROM messages m INNER JOIN users u ON m.user_id = u.user_id 
-            WHERE m.id in (SELECT message_id FROM messages_fts4 WHERE messages_fts4 MATCH :query) 
+            FROM messages m, (SELECT message_id FROM messages_fts4 WHERE messages_fts4 MATCH :query) fts
+            INNER JOIN users u ON m.user_id = u.user_id 
+            WHERE m.id = fts.message_id
             AND m.conversation_id = :conversationId
             ORDER BY m.created_at DESC
         """
@@ -337,6 +338,9 @@ interface MessageDao : BaseDao<Message> {
 
     @Query("UPDATE messages SET content = :content WHERE id = :id")
     fun updateMessageContent(content: String, id: String)
+
+    @Query("UPDATE messages SET media_url = :mediaUrl, media_size = :mediaSize, thumb_image = :thumbImage WHERE id = :id AND category != 'MESSAGE_RECALL'")
+    fun updateGiphyMessage(id: String, mediaUrl: String, mediaSize: Long, thumbImage: String?)
 
     @Query("SELECT * FROM messages WHERE id = :messageId")
     fun findMessageById(messageId: String): Message?
@@ -451,6 +455,12 @@ interface MessageDao : BaseDao<Message> {
 
     @Query("SELECT * FROM messages WHERE id IN (:messageIds) ORDER BY created_at, rowid")
     suspend fun getSortMessagesByIds(messageIds: List<String>): List<Message>
+
+    @Query("SELECT id FROM messages WHERE conversation_id =:conversationId")
+    suspend fun getMessageIdsByConversationId(conversationId: String): List<String>
+
+    @Query("SELECT id FROM messages WHERE conversation_id =:conversationId ORDER BY rowid LIMIT :limit")
+    suspend fun getMessageIdsByConversationId(conversationId: String, limit: Int): List<String>
 
     @Query(
         """

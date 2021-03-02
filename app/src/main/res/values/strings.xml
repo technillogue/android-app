@@ -234,6 +234,7 @@
     <string name="landing_check_updates">Version Update</string>
     <string name="update_mixin">Update Mixin</string>
     <string name="update_mixin_description">The current version (%1$s) is no longer avaliable!\nPlease click "Update" below to update to the latest version from the Google Play.</string>
+    <string name="database_debug">Debug database</string>
     <!--contacts-->
     <string name="contact_new_group_chat_title">New Group Chat</string>
     <string name="contact_new_group_chat_desc">Create a group chat with up to  friends</string>
@@ -530,9 +531,10 @@
     <string name="conversation_status_location">[Location]</string>
     <string name="conversation_status_live">[Live]</string>
     <string name="conversation_status_group_call">[Group Call]</string>
+    <string name="setting_incognito">Incognito Keyboard</string>
     <string name="setting_no_blocked">No blocked users</string>
-    <string name="setting_no_auth_app">No auth app</string>
     <string name="setting_authentications">Authorizations</string>
+    <string name="setting_no_auth_app">No auth app</string>
     <string name="setting_permissions">Permissions</string>
     <string name="setting_no_authentications">No RESULT</string>
     <string name="setting_emergency">Emergency Contact</string>
@@ -941,5 +943,9 @@
     <string name="version_title">New version</string>
     <string name="version_content">There is a new version update</string>
     <string name="version_update">Update</string>
+    <!-- debug -->
+    <string name="db_debug_enable">Enable db debug</string>
+    <string name="db_debug_disable">Disable db debug</string>
+    <string name="db_debug_warning">Attention: If a harmful SQL statement is executed, the result is irreversible!</string>
 </resources>
 

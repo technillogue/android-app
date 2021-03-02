@@ -148,6 +148,8 @@ class WalletSearchFragment : BaseFragment() {
                 if (binding.searchEt.text.isNullOrBlank() && binding.rvVa.displayedChild == POS_SEARCH) {
                     binding.rvVa.displayedChild = POS_DEFAULT
                 }
+
+                checkRecent()
             }
         )
         searchDefaultAdapter.recentAssets = loadRecentSearchAssets()
@@ -166,6 +168,28 @@ class WalletSearchFragment : BaseFragment() {
         }
     }
 
+    private fun checkRecent() = lifecycleScope.launch {
+        if (viewDestroyed()) return@launch
+
+        val recentAssets = searchDefaultAdapter.recentAssets
+        if (recentAssets.isNullOrEmpty()) return@launch
+
+        val newRecentList = viewModel.findAssetsByIds(recentAssets.take(2).map { it.assetId })
+        var needRefreshRecent = false
+        newRecentList.forEach { n ->
+            val needUpdate = recentAssets.find { r ->
+                r.assetId == n.assetId && r.priceUsd != n.priceUsd
+            }
+            if (needUpdate != null) {
+                needRefreshRecent = true
+                return@forEach
+            }
+        }
+        if (needRefreshRecent) {
+            searchDefaultAdapter.recentAssets = newRecentList
+        }
+    }
+
     private fun search(query: String) {
         currentSearch?.cancel()
         currentSearch = lifecycleScope.launch {
@@ -174,7 +198,7 @@ class WalletSearchFragment : BaseFragment() {
             searchAdapter.clear()
             binding.pb.isVisible = true
 
-            val localAssets = viewModel.fuzzySearchAssets(query)
+            var localAssets = viewModel.fuzzySearchAssets(query)
             searchAdapter.localAssets = localAssets
 
             val pair = viewModel.queryAsset(query)
@@ -182,15 +206,17 @@ class WalletSearchFragment : BaseFragment() {
             if (localAssets.isNullOrEmpty()) {
                 searchAdapter.remoteAssets = remoteAssets
             } else {
+                localAssets = viewModel.fuzzySearchAssets(query)
                 val filtered = mutableListOf<TopAssetItem>()
                 remoteAssets?.forEach { remote ->
-                    val exists = localAssets.find { local ->
+                    val exists = localAssets?.find { local ->
                         local.assetId == remote.assetId
                     }
                     if (exists == null) {
                         filtered.add(remote)
                     }
                 }
+                searchAdapter.localAssets = localAssets
                 searchAdapter.remoteAssets = filtered
             }
             binding.pb.isVisible = false

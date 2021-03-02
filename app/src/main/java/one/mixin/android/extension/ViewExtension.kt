@@ -5,8 +5,6 @@ import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Outline
 import android.net.Uri
 import android.os.Bundle
@@ -30,6 +28,7 @@ import androidx.core.animation.doOnStart
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.ViewPropertyAnimatorListener
+import androidx.core.view.drawToBitmap
 import androidx.core.view.updateLayoutParams
 import androidx.navigation.NavOptions
 import androidx.navigation.findNavController
@@ -274,9 +273,7 @@ fun View.navigate(
 @Throws(IOException::class)
 fun View.capture(context: Context): String? {
     val outFile = context.getPublicPicturePath().createImagePngTemp(false)
-    val b = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val c = Canvas(b)
-    draw(c)
+    val b = drawToBitmap()
     b.save(outFile)
     return try {
         context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(outFile)))

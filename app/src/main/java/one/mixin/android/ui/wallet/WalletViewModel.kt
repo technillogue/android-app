@@ -35,9 +35,12 @@ import one.mixin.android.util.ErrorHandler
 import one.mixin.android.vo.Account
 import one.mixin.android.vo.Asset
 import one.mixin.android.vo.AssetItem
+import one.mixin.android.vo.PendingDeposit
+import one.mixin.android.vo.PriceAndChange
 import one.mixin.android.vo.SnapshotItem
 import one.mixin.android.vo.TopAssetItem
 import one.mixin.android.vo.User
+import one.mixin.android.vo.toPriceAndChange
 import one.mixin.android.vo.toSnapshot
 import one.mixin.android.vo.toTopAssetItem
 
@@ -142,13 +145,27 @@ internal constructor(
             },
             successBlock = { list ->
                 assetRepository.clearPendingDepositsByAssetId(asset.assetId)
-                list.data?.map {
-                    it.toSnapshot(asset.assetId)
-                }?.let {
-                    assetRepository.insertPendingDeposit(it)
+                val pendingDeposits = list.data ?: return@handleMixinResponse
+
+                pendingDeposits.chunked(100) { trunk ->
+                    viewModelScope.launch(Dispatchers.IO) {
+                        processPendingDepositTrunk(asset.assetId, trunk)
+                    }
                 }
             }
         )
+    }
+
+    private suspend fun processPendingDepositTrunk(assetId: String, trunk: List<PendingDeposit>) {
+        val hashList = trunk.map { it.transactionHash }
+        val existHashList = assetRepository.findSnapshotByTransactionHashList(assetId, hashList)
+        trunk.filter {
+            it.transactionHash !in existHashList
+        }.map {
+            it.toSnapshot(assetId)
+        }.let {
+            assetRepository.insertPendingDeposit(it)
+        }
     }
 
     suspend fun getAsset(assetId: String) = withContext(Dispatchers.IO) {
@@ -182,11 +199,16 @@ internal constructor(
                     asset.toTopAssetItem(chainIconUrl)
                 }
                 val existsSet = ArraySet<AssetItem>()
-                topAssetList.forEach {
+                val needUpdatePrice = arrayListOf<PriceAndChange>()
+                assetList.forEach {
                     val exists = assetRepository.findAssetItemById(it.assetId)
                     if (exists != null) {
+                        needUpdatePrice.add(it.toPriceAndChange())
                         existsSet.add(exists)
                     }
+                }
+                if (needUpdatePrice.isNotEmpty()) {
+                    assetRepository.suspendUpdatePrices(needUpdatePrice)
                 }
                 return@withContext Pair(topAssetList, existsSet)
             } else {

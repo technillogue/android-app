@@ -18,7 +18,6 @@ import one.mixin.android.extension.dpToPx
 import one.mixin.android.extension.getColorCode
 import one.mixin.android.extension.isActivityNotDestroyed
 import one.mixin.android.extension.loadImage
-import one.mixin.android.extension.round
 import one.mixin.android.ui.home.bot.Bot
 import one.mixin.android.vo.App
 import one.mixin.android.vo.BotInterface
@@ -94,11 +93,6 @@ class AvatarView : ViewAnimator {
         avatarSimple.setBackgroundResource(R.drawable.bg_circle_70_solid_gray)
         avatarSimple.setImageResource(R.drawable.ic_transfer_address)
         avatarSimple.setPadding(padding)
-    }
-
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        binding.avatarTv.round((right - left) / 2)
     }
 
     fun setInfo(name: String?, url: String?, id: String) {

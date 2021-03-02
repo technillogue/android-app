@@ -36,6 +36,7 @@ import one.mixin.android.api.response.MultisigsResponse
 import one.mixin.android.api.response.PaymentCodeResponse
 import one.mixin.android.api.response.getScopes
 import one.mixin.android.databinding.FragmentBottomSheetBinding
+import one.mixin.android.extension.appendQueryParamsFromOtherUri
 import one.mixin.android.extension.booleanFromAttribute
 import one.mixin.android.extension.dpToPx
 import one.mixin.android.extension.getGroupAvatarPath
@@ -61,6 +62,7 @@ import one.mixin.android.ui.common.biometric.TransferBiometricItem
 import one.mixin.android.ui.common.biometric.WithdrawBiometricItem
 import one.mixin.android.ui.conversation.ConversationActivity
 import one.mixin.android.ui.conversation.PreconditionBottomSheetDialogFragment
+import one.mixin.android.ui.conversation.PreconditionBottomSheetDialogFragment.Companion.FROM_LINK
 import one.mixin.android.ui.conversation.tansfer.TransferBottomSheetDialogFragment
 import one.mixin.android.ui.home.MainActivity
 import one.mixin.android.ui.url.UrlInterpreterActivity
@@ -73,6 +75,7 @@ import one.mixin.android.vo.Address
 import one.mixin.android.vo.AssetItem
 import one.mixin.android.vo.User
 import timber.log.Timber
+import java.lang.Exception
 import java.util.UUID
 
 @AndroidEntryPoint
@@ -175,7 +178,12 @@ class LinkBottomSheetDialogFragment : BottomSheetDialogFragment() {
                         lifecycleScope.launch {
                             val app = linkViewModel.findAppById(user.appId!!)
                             if (app != null) {
-                                WebActivity.show(requireActivity(), app.homeUri, null, app)
+                                val url = try {
+                                    app.homeUri.appendQueryParamsFromOtherUri(uri)
+                                } catch (e: Exception) {
+                                    app.homeUri
+                                }
+                                WebActivity.show(requireActivity(), url, null, app)
                             } else {
                                 UserBottomSheetDialogFragment.newInstance(user)
                                     .showNow(parentFragmentManager, UserBottomSheetDialogFragment.TAG)
@@ -649,7 +657,7 @@ class LinkBottomSheetDialogFragment : BottomSheetDialogFragment() {
     }
 
     private fun showPreconditionBottom(biometricItem: BiometricItem) {
-        val preconditionBottom = PreconditionBottomSheetDialogFragment.newInstance(biometricItem)
+        val preconditionBottom = PreconditionBottomSheetDialogFragment.newInstance(biometricItem, FROM_LINK)
         preconditionBottom.callback = object : PreconditionBottomSheetDialogFragment.Callback {
             override fun onSuccess() {
                 val bottom = TransferBottomSheetDialogFragment.newInstance(biometricItem)

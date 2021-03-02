@@ -189,7 +189,9 @@ import one.mixin.android.vo.UserRelationship
 import one.mixin.android.vo.canRecall
 import one.mixin.android.vo.generateConversationId
 import one.mixin.android.vo.giphy.Image
+import one.mixin.android.vo.isAudio
 import one.mixin.android.vo.isLive
+import one.mixin.android.vo.isSticker
 import one.mixin.android.vo.saveToLocal
 import one.mixin.android.vo.supportSticker
 import one.mixin.android.vo.toApp
@@ -315,7 +317,9 @@ class ConversationFragment() :
                         if (context?.sharedPreferences(RefreshConversationJob.PREFERENCES_CONVERSATION)
                             ?.getBoolean(conversationId, false) == true
                         ) {
-                            chatViewModel.viewModelScope.launch {
+                            lifecycleScope.launch {
+                                if (viewDestroyed()) return@launch
+
                                 binding.groupDesc.text = chatViewModel.getAnnouncementByConversationId(conversationId)
                                 binding.groupDesc.collapse()
                                 binding.groupDesc.requestFocus()
@@ -995,7 +999,7 @@ class ConversationFragment() :
         if (binding.chatControl.getVisibleContainer() == null) {
             ViewCompat.getRootWindowInsets(binding.inputArea)?.let { windowInsetsCompat ->
                 val imeHeight = windowInsetsCompat.getInsets(WindowInsetsCompat.Type.ime()).bottom
-                if (imeHeight > 0) {
+                if (imeHeight > 0 && Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
                     binding.inputLayout.openInputArea(binding.chatControl.chatEt)
                 } else {
                     binding.inputLayout.forceClose(binding.chatControl.chatEt)
@@ -1109,6 +1113,7 @@ class ConversationFragment() :
     }
 
     override fun onDestroyView() {
+        chatViewModel.keyLivePagedListBuilder = null
         if (isAdded) {
             chatAdapter.unregisterAdapterDataObserver(chatAdapterDataObserver)
         }
@@ -1187,7 +1192,9 @@ class ConversationFragment() :
 
     private fun closeTool() {
         chatAdapter.selectSet.clear()
-        chatAdapter.notifyDataSetChanged()
+        if (!binding.chatRv.isComputingLayout) {
+            chatAdapter.notifyDataSetChanged()
+        }
         binding.toolView.fadeOut()
     }
 
@@ -1243,6 +1250,7 @@ class ConversationFragment() :
             object : RecyclerView.OnScrollListener() {
 
                 override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    setVisibleKey(recyclerView)
                     firstPosition = (binding.chatRv.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
                     if (firstPosition > 0) {
                         if (isBottom) {
@@ -1255,6 +1263,10 @@ class ConversationFragment() :
                         unreadTipCount = 0
                         binding.flagLayout.bottomCountFlag = false
                     }
+                }
+
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    setVisibleKey(recyclerView)
                 }
             }
         )
@@ -1323,7 +1335,7 @@ class ConversationFragment() :
             )
         binding.toolView.closeIv.setOnClickListener { activity?.onBackPressed() }
         binding.toolView.deleteIv.setOnClickListener {
-            chatAdapter.selectSet.filter { it.type.endsWith("_AUDIO") }.forEach {
+            chatAdapter.selectSet.filter { it.isAudio() }.forEach {
                 if (AudioPlayer.isPlay(it.messageId)) {
                     AudioPlayer.pause()
                 }
@@ -1358,7 +1370,7 @@ class ConversationFragment() :
             }
             val messageItem = chatAdapter.selectSet.valueAt(0)
             messageItem?.let { m ->
-                val isSticker = messageItem.type.endsWith("STICKER")
+                val isSticker = messageItem.isSticker()
                 if (isSticker && m.stickerId != null) {
                     addSticker(m)
                 } else {
@@ -2375,9 +2387,19 @@ class ConversationFragment() :
                             offset
                         )
                     }
-                    action?.let { it() }
-                    if (abs(firstPosition - position) > PAGE_SIZE * 6) {
-                        chatAdapter.notifyDataSetChanged()
+                    if (abs(firstPosition - position) > PAGE_SIZE * 3) {
+                        binding.chatRv.postDelayed(
+                            {
+                                (binding.chatRv.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(
+                                    position,
+                                    offset
+                                )
+                                action?.let { it() }
+                            },
+                            160
+                        )
+                    } else {
+                        action?.let { it() }
                     }
                 }
             },
@@ -2797,5 +2819,12 @@ class ConversationFragment() :
             binding.chatControl.cancelExternal()
         }
         binding.chatControl.chatEt.showKeyboard()
+    }
+
+    private fun setVisibleKey(rv: RecyclerView, unreadCount: Int = 0) {
+        val lm = rv.layoutManager as LinearLayoutManager
+        val firstVisiblePosition: Int = lm.findFirstVisibleItemPosition()
+        val firstKeyToLoad: Int = if (unreadCount <= 0) firstVisiblePosition else unreadCount
+        chatViewModel.keyLivePagedListBuilder?.setFirstKeyToLoad(firstKeyToLoad)
     }
 }
