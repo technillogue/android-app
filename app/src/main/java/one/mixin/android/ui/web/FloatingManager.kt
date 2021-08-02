@@ -27,6 +27,7 @@ import one.mixin.android.util.GsonHelper
 import one.mixin.android.util.SINGLE_THREAD
 import one.mixin.android.vo.App
 import one.mixin.android.widget.MixinWebView
+import org.jetbrains.anko.collections.forEachByIndex
 
 private const val PREF_FLOATING = "floating"
 private var screenshot: Bitmap? = null
@@ -81,8 +82,8 @@ fun collapse(activity: Activity) {
 var clips = mutableListOf<WebClip>()
 
 data class WebClip(
-    val url: String,
-    val app: App?,
+    var url: String,
+    var app: App?,
     @ColorInt
     val titleColor: Int,
     val name: String?,
@@ -174,6 +175,21 @@ fun saveClips() {
             PREF_FLOATING,
             GsonHelper.customGson.toJson(localClips)
         )
+    }
+}
+
+fun replaceApp(app: App) {
+    var hasChange = false
+    clips.forEachIndexed { index, webClip ->
+        if (webClip.url == webClip.app?.homeUri && webClip.app?.appId == app.appId) {
+            webClip.url = app.homeUri
+            webClip.app = app
+            clips[index] = webClip
+            hasChange = true
+        }
+    }
+    if (hasChange) {
+        saveClips()
     }
 }
 
