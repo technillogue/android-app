@@ -16,7 +16,7 @@ import one.mixin.android.util.GsonHelper
 import one.mixin.android.vo.MediaStatus
 import one.mixin.android.vo.MessageItem
 import one.mixin.android.vo.QuoteMessageItem
-import one.mixin.android.vo.isSignal
+import one.mixin.android.vo.isSecret
 import org.jetbrains.anko.dip
 import kotlin.math.min
 
@@ -256,7 +256,7 @@ class ImageQuoteHolder constructor(val binding: ItemChatImageQuoteBinding) : Med
         } else {
             binding.chatName.setCompoundDrawables(null, null, null, null)
         }
-        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), isRepresentative, true) { statusIcon, secretIcon, representativeIcon ->
+        setStatusIcon(isMe, messageItem.status, messageItem.isSecret(), isRepresentative, true) { statusIcon, secretIcon, representativeIcon ->
             statusIcon?.setBounds(0, 0, dp12, dp12)
             secretIcon?.setBounds(0, 0, dp8, dp8)
             representativeIcon?.setBounds(0, 0, dp8, dp8)

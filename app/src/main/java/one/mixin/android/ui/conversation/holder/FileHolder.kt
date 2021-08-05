@@ -21,7 +21,7 @@ import one.mixin.android.ui.conversation.adapter.ConversationAdapter
 import one.mixin.android.util.MusicPlayer
 import one.mixin.android.vo.MediaStatus
 import one.mixin.android.vo.MessageItem
-import one.mixin.android.vo.isSignal
+import one.mixin.android.vo.isSecret
 import org.jetbrains.anko.dip
 
 class FileHolder constructor(val binding: ItemChatFileBinding) : BaseViewHolder(binding.root) {
@@ -46,7 +46,7 @@ class FileHolder constructor(val binding: ItemChatFileBinding) : BaseViewHolder(
         } else {
             itemView.setBackgroundColor(Color.TRANSPARENT)
         }
-        binding.billTime.chatSecret.isVisible = messageItem.isSignal()
+        binding.billTime.chatSecret.isVisible = messageItem.isSecret()
         val isMe = meId == messageItem.userId
         chatLayout(isMe, isLast)
         if (isFirst && !isMe) {
@@ -104,7 +104,7 @@ class FileHolder constructor(val binding: ItemChatFileBinding) : BaseViewHolder(
                 binding.bottomLayout.fileSizeTv.clearBindIdAndSetText(messageItem.mediaSize?.fileSize())
             }
         }
-        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), isRepresentative) { statusIcon, secretIcon, representativeIcon ->
+        setStatusIcon(isMe, messageItem.status, messageItem.isSecret(), isRepresentative) { statusIcon, secretIcon, representativeIcon ->
             binding.billTime.chatFlag.isVisible = statusIcon != null
             binding.billTime.chatFlag.setImageDrawable(statusIcon)
             binding.billTime.chatSecret.isVisible = secretIcon != null

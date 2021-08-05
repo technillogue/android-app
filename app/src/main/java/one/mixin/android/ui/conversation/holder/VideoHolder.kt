@@ -25,7 +25,7 @@ import one.mixin.android.vo.MediaStatus
 import one.mixin.android.vo.MessageCategory
 import one.mixin.android.vo.MessageItem
 import one.mixin.android.vo.isLive
-import one.mixin.android.vo.isSignal
+import one.mixin.android.vo.isSecret
 import org.jetbrains.anko.dip
 
 class VideoHolder constructor(val binding: ItemChatVideoBinding) : MediaHolder(binding.root) {
@@ -260,7 +260,7 @@ class VideoHolder constructor(val binding: ItemChatVideoBinding) : MediaHolder(b
         }
         binding.chatTime.timeAgoClock(messageItem.createdAt)
 
-        setStatusIcon(isMe, messageItem.status, messageItem.isSignal(), isRepresentative, true) { statusIcon, secretIcon, representativeIcon ->
+        setStatusIcon(isMe, messageItem.status, messageItem.isSecret(), isRepresentative, true) { statusIcon, secretIcon, representativeIcon ->
             statusIcon?.setBounds(0, 0, dp12, dp12)
             secretIcon?.setBounds(0, 0, dp8, dp8)
             representativeIcon?.setBounds(0, 0, dp8, dp8)
