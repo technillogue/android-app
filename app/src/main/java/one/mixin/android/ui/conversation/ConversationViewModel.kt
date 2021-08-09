@@ -60,6 +60,7 @@ import one.mixin.android.vo.AppItem
 import one.mixin.android.vo.AssetItem
 import one.mixin.android.vo.ConversationCategory
 import one.mixin.android.vo.ConversationStatus
+import one.mixin.android.vo.EncryptCategory
 import one.mixin.android.vo.ForwardCategory
 import one.mixin.android.vo.ForwardMessage
 import one.mixin.android.vo.MediaStatus
@@ -78,11 +79,14 @@ import one.mixin.android.vo.TranscriptMessage
 import one.mixin.android.vo.User
 import one.mixin.android.vo.createAckJob
 import one.mixin.android.vo.createConversation
+import one.mixin.android.vo.encryptedCategory
 import one.mixin.android.vo.generateConversationId
 import one.mixin.android.vo.giphy.Gif
 import one.mixin.android.vo.giphy.Image
+import one.mixin.android.vo.isEncrypted
 import one.mixin.android.vo.isGroupConversation
 import one.mixin.android.vo.isImage
+import one.mixin.android.vo.isSignal
 import one.mixin.android.vo.isTranscript
 import one.mixin.android.vo.isVideo
 import one.mixin.android.webrtc.SelectItem
@@ -157,17 +161,17 @@ internal constructor(
     fun findUserById(conversationId: String): LiveData<User> =
         userRepository.findUserById(conversationId)
 
-    fun sendTextMessage(conversationId: String, sender: User, content: String, isEncrypted: Boolean, isSilent: Boolean? = null) {
-        messenger.sendTextMessage(viewModelScope, conversationId, sender, content, isEncrypted, isSilent)
+    fun sendTextMessage(conversationId: String, sender: User, content: String, encryptCategory: EncryptCategory, isSilent: Boolean? = null) {
+        messenger.sendTextMessage(viewModelScope, conversationId, sender, content, encryptCategory, isSilent)
     }
 
     // todo
-    fun sendTranscriptMessage(conversationId: String, messageId: String?, sender: User, transcriptMessages: List<TranscriptMessage>, isPlain: Boolean) {
-        messenger.sendTranscriptMessage(messageId ?: UUID.randomUUID().toString(), conversationId, sender, transcriptMessages, isPlain)
+    fun sendTranscriptMessage(conversationId: String, messageId: String?, sender: User, transcriptMessages: List<TranscriptMessage>, encryptCategory: EncryptCategory) {
+        messenger.sendTranscriptMessage(messageId ?: UUID.randomUUID().toString(), conversationId, sender, transcriptMessages, encryptCategory)
     }
 
-    fun sendPostMessage(conversationId: String, sender: User, content: String, isEncrypted: Boolean) {
-        messenger.sendPostMessage(conversationId, sender, content, isEncrypted)
+    fun sendPostMessage(conversationId: String, sender: User, content: String, encryptCategory: EncryptCategory) {
+        messenger.sendPostMessage(conversationId, sender, content, encryptCategory)
     }
 
     fun sendAppCardMessage(conversationId: String, sender: User, content: String) {
@@ -179,14 +183,14 @@ internal constructor(
         sender: User,
         content: String,
         replyMessage: MessageItem,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         isSilentMessage: Boolean? = null
     ) {
-        messenger.sendReplyTextMessage(conversationId, sender, content, replyMessage, isEncrypted, isSilentMessage)
+        messenger.sendReplyTextMessage(conversationId, sender, content, replyMessage, encryptCategory, isSilentMessage)
     }
 
-    fun sendAttachmentMessage(conversationId: String, sender: User, attachment: Attachment, isEncrypted: Boolean, replyMessage: MessageItem? = null) {
-        messenger.sendAttachmentMessage(conversationId, sender, attachment, isEncrypted, replyMessage)
+    fun sendAttachmentMessage(conversationId: String, sender: User, attachment: Attachment, encryptCategory: EncryptCategory, replyMessage: MessageItem? = null) {
+        messenger.sendAttachmentMessage(conversationId, sender, attachment, encryptCategory, replyMessage)
     }
 
     fun sendAudioMessage(
@@ -196,39 +200,39 @@ internal constructor(
         file: File,
         duration: Long,
         waveForm: ByteArray,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         replyMessage: MessageItem? = null
     ) {
-        messenger.sendAudioMessage(conversationId, messageId, sender, file, duration, waveForm, isEncrypted, replyMessage)
+        messenger.sendAudioMessage(conversationId, messageId, sender, file, duration, waveForm, encryptCategory, replyMessage)
     }
 
     fun sendAudioMessage(
         conversationId: String,
         sender: User,
         audioMessagePayload: AudioMessagePayload,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         replyMessage: MessageItem? = null
     ) {
         val messageId = audioMessagePayload.messageId
         val file = File(audioMessagePayload.url)
         val duration = audioMessagePayload.duration
         val waveForm = audioMessagePayload.waveForm
-        messenger.sendAudioMessage(conversationId, messageId, sender, file, duration, waveForm, isEncrypted, replyMessage)
+        messenger.sendAudioMessage(conversationId, messageId, sender, file, duration, waveForm, encryptCategory, replyMessage)
     }
 
     fun sendStickerMessage(
         conversationId: String,
         sender: User,
         transferStickerData: StickerMessagePayload,
-        isEncrypted: Boolean
+        encryptCategory: EncryptCategory
     ) {
-        messenger.sendStickerMessage(conversationId, sender, transferStickerData, isEncrypted)
+        messenger.sendStickerMessage(conversationId, sender, transferStickerData, encryptCategory)
     }
 
-    fun sendContactMessage(conversationId: String, sender: User, shareUserId: String, isEncrypted: Boolean, replyMessage: MessageItem? = null) {
+    fun sendContactMessage(conversationId: String, sender: User, shareUserId: String, encryptCategory: EncryptCategory, replyMessage: MessageItem? = null) {
         viewModelScope.launch {
             val user = userRepository.suspendFindUserById(shareUserId)
-            messenger.sendContactMessage(conversationId, sender, shareUserId, user?.fullName, isEncrypted, replyMessage)
+            messenger.sendContactMessage(conversationId, sender, shareUserId, user?.fullName, encryptCategory, replyMessage)
         }
     }
 
@@ -236,25 +240,25 @@ internal constructor(
         conversationId: String,
         senderId: String,
         uri: Uri,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         messageId: String? = null,
         createdAt: String? = null,
         replyMessage: MessageItem? = null
     ) {
-        messenger.sendVideoMessage(conversationId, senderId, uri, isEncrypted, messageId, createdAt, replyMessage)
+        messenger.sendVideoMessage(conversationId, senderId, uri, encryptCategory, messageId, createdAt, replyMessage)
     }
 
     fun sendVideoMessage(
         conversationId: String,
         senderId: String,
         videoMessagePayload: VideoMessagePayload,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         replyMessage: MessageItem? = null
     ) {
         val uri = videoMessagePayload.url.toUri()
         val messageId = videoMessagePayload.messageId
         val createdAt = videoMessagePayload.createdAt
-        messenger.sendVideoMessage(conversationId, senderId, uri, isEncrypted, messageId, createdAt, replyMessage)
+        messenger.sendVideoMessage(conversationId, senderId, uri, encryptCategory, messageId, createdAt, replyMessage)
     }
 
     fun sendRecallMessage(conversationId: String, sender: User, list: List<MessageItem>) {
@@ -265,34 +269,34 @@ internal constructor(
         conversationId: String,
         sender: User,
         transferLiveData: LiveMessagePayload,
-        isEncrypted: Boolean
+        encryptCategory: EncryptCategory
     ) {
-        messenger.sendLiveMessage(conversationId, sender, transferLiveData, isEncrypted)
+        messenger.sendLiveMessage(conversationId, sender, transferLiveData, encryptCategory)
     }
 
     fun sendGiphyMessage(
         conversationId: String,
         senderId: String,
         image: Image,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         previewUrl: String
     ) {
-        messenger.sendGiphyMessage(conversationId, senderId, image, isEncrypted, previewUrl)
+        messenger.sendGiphyMessage(conversationId, senderId, image, encryptCategory, previewUrl)
     }
 
-    fun sendLocationMessage(conversationId: String, senderId: String, location: LocationPayload, isEncrypted: Boolean) {
-        messenger.sendLocationMessage(conversationId, senderId, location, isEncrypted)
+    fun sendLocationMessage(conversationId: String, senderId: String, location: LocationPayload, encryptCategory: EncryptCategory) {
+        messenger.sendLocationMessage(conversationId, senderId, location, encryptCategory)
     }
 
     fun sendImageMessage(
         conversationId: String,
         sender: User,
         uri: Uri,
-        isEncrypted: Boolean,
+        encryptCategory: EncryptCategory,
         mime: String? = null,
         replyMessage: MessageItem? = null,
     ): Int {
-        return messenger.sendImageMessage(conversationId, sender, uri, isEncrypted, mime, replyMessage)
+        return messenger.sendImageMessage(conversationId, sender, uri, encryptCategory, mime, replyMessage)
     }
 
     fun updateRelationship(request: RelationshipRequest) {
@@ -344,7 +348,11 @@ internal constructor(
                                 it.conversationId,
                                 it.userId,
                                 Uri.parse(it.mediaUrl),
-                                it.category.startsWith("PLAIN"),
+                                when  {
+                                    it.isSignal() -> EncryptCategory.SIGNAL
+                                    it.isEncrypted() -> EncryptCategory.ENCRYPTED
+                                    else -> EncryptCategory.PLAIN
+                                },
                                 it.id,
                                 it.createdAt
                             )
@@ -769,25 +777,25 @@ internal constructor(
     suspend fun findLatestTrace(opponentId: String?, destination: String?, tag: String?, amount: String, assetId: String) =
         assetRepository.findLatestTrace(opponentId, destination, tag, amount, assetId)
 
-    suspend fun checkData(selectItem: SelectItem, callback: suspend (String, Boolean) -> Unit) {
+    suspend fun checkData(selectItem: SelectItem, callback: suspend (String, EncryptCategory) -> Unit) {
         withContext(Dispatchers.IO) {
             if (selectItem.conversationId != null) {
                 val conversation = conversationRepository.getConversation(selectItem.conversationId)
                 if (conversation != null) {
                     if (conversation.isGroupConversation()) {
                         withContext(Dispatchers.Main) {
-                            callback(conversation.conversationId, false)
+                            callback(conversation.conversationId, EncryptCategory.SIGNAL)
                         }
                     } else {
                         userRepository.findContactByConversationId(selectItem.conversationId)?.let { user ->
                             withContext(Dispatchers.Main) {
-                                callback(conversation.conversationId, user.isBot())
+                                callback(conversation.conversationId, user.encryptedCategory())
                             }
                         }
                     }
                 }
             } else if (selectItem.userId != null) {
-                userRepository.getUserById(selectItem.userId)?.let { user ->
+                userRepository.findForwardUserById(selectItem.userId)?.let { user ->
                     val conversation = conversationRepository.findContactConversationByOwnerId(user.userId)
                     if (conversation == null) {
                         val createdAt = nowInUtc()
@@ -806,7 +814,7 @@ internal constructor(
                             participants
                         )
                         withContext(Dispatchers.Main) {
-                            callback(conversationId, user.isBot())
+                            callback(conversationId, user.encryptedCategory())
                         }
                     }
                 }
