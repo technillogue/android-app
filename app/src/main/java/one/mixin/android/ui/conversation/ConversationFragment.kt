@@ -1883,9 +1883,9 @@ class ConversationFragment() :
     private fun encryptCategory(): EncryptCategory {
         return if (isBot && app?.capabilities?.contains("ENCRYPTED") == true) {
             EncryptCategory.ENCRYPTED
-        } else if (isBot){
+        } else if (isBot) {
             EncryptCategory.PLAIN
-        }else{
+        } else {
             EncryptCategory.SIGNAL
         }
     }
