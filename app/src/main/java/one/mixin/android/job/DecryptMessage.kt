@@ -709,9 +709,39 @@ class DecryptMessage(private val lifecycleScope: CoroutineScope) : Injector() {
             transcript.mediaSize?.let {
                 mediaSize += it
             }
-            when {
-                transcript.isImage() -> {
-                    MixinApplication.appContext.autoDownload(autoDownloadPhoto) {
+            lifecycleScope.launch {
+                when {
+                    transcript.isImage() -> {
+                        MixinApplication.appContext.autoDownload(autoDownloadPhoto) {
+                            jobManager.addJobInBackground(
+                                TranscriptAttachmentDownloadJob(
+                                    data.conversationId,
+                                    transcript
+                                )
+                            )
+                        }
+                    }
+                    transcript.isVideo() -> {
+                        MixinApplication.appContext.autoDownload(autoDownloadVideo) {
+                            jobManager.addJobInBackground(
+                                TranscriptAttachmentDownloadJob(
+                                    data.conversationId,
+                                    transcript
+                                )
+                            )
+                        }
+                    }
+                    transcript.isData() -> {
+                        MixinApplication.appContext.autoDownload(autoDownloadDocument) {
+                            jobManager.addJobInBackground(
+                                TranscriptAttachmentDownloadJob(
+                                    data.conversationId,
+                                    transcript
+                                )
+                            )
+                        }
+                    }
+                    transcript.isAudio() -> {
                         jobManager.addJobInBackground(
                             TranscriptAttachmentDownloadJob(
                                 data.conversationId,
@@ -719,34 +749,6 @@ class DecryptMessage(private val lifecycleScope: CoroutineScope) : Injector() {
                             )
                         )
                     }
-                }
-                transcript.isVideo() -> {
-                    MixinApplication.appContext.autoDownload(autoDownloadVideo) {
-                        jobManager.addJobInBackground(
-                            TranscriptAttachmentDownloadJob(
-                                data.conversationId,
-                                transcript
-                            )
-                        )
-                    }
-                }
-                transcript.isData() -> {
-                    MixinApplication.appContext.autoDownload(autoDownloadDocument) {
-                        jobManager.addJobInBackground(
-                            TranscriptAttachmentDownloadJob(
-                                data.conversationId,
-                                transcript
-                            )
-                        )
-                    }
-                }
-                transcript.isAudio() -> {
-                    jobManager.addJobInBackground(
-                        TranscriptAttachmentDownloadJob(
-                            data.conversationId,
-                            transcript
-                        )
-                    )
                 }
             }
         }
