@@ -150,6 +150,7 @@ class KeyboardLayout : LinearLayout {
                         inputAreaHeight = value
                     }
                     if (value > 0) {
+                        keyboardHeight = value
                         onKeyboardShownListener?.onKeyboardShown(value)
                     } else {
                         onKeyboardHiddenListener?.onKeyboardHidden()
@@ -187,14 +188,6 @@ class KeyboardLayout : LinearLayout {
                     if (status == STATUS.EXPANDED) {
                         gap = _inputArea.layoutParams.height - keyboardHeight
                     }
-                }
-
-                override fun onStart(
-                    animation: WindowInsetsAnimationCompat,
-                    bounds: WindowInsetsAnimationCompat.BoundsCompat
-                ): WindowInsetsAnimationCompat.BoundsCompat {
-                    keyboardHeight = bounds.upperBound.bottom
-                    return super.onStart(animation, bounds)
                 }
             }
         )
