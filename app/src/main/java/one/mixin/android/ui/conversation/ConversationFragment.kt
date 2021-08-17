@@ -169,6 +169,7 @@ import one.mixin.android.ui.conversation.preview.PreviewDialogFragment
 import one.mixin.android.ui.conversation.transcript.TranscriptActivity
 import one.mixin.android.ui.forward.ForwardActivity
 import one.mixin.android.ui.forward.ForwardActivity.Companion.ARGS_RESULT
+import one.mixin.android.ui.imageeditor.ImageEditorActivity
 import one.mixin.android.ui.media.pager.MediaPagerActivity
 import one.mixin.android.ui.player.FloatingPlayer
 import one.mixin.android.ui.player.MediaItemData
@@ -983,6 +984,7 @@ class ConversationFragment() :
 
     lateinit var getForwardResult: ActivityResultLauncher<Pair<ArrayList<ForwardMessage>, String?>>
     lateinit var getCombineForwardContract: ActivityResultLauncher<ArrayList<TranscriptMessage>>
+    lateinit var getEditorResult: ActivityResultLauncher<Uri>
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -990,6 +992,7 @@ class ConversationFragment() :
 
         getForwardResult = registerForActivityResult(ForwardActivity.ForwardContract(), resultRegistry, ::callbackForward)
         getCombineForwardContract = registerForActivityResult(ForwardActivity.CombineForwardContract(), resultRegistry, ::callbackForward)
+        getEditorResult = registerForActivityResult(ImageEditorActivity.ImageEditorContract(), resultRegistry, ::callbackEditor)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1326,7 +1329,7 @@ class ConversationFragment() :
                     if (inputContentInfo != null) {
                         val url = inputContentInfo.contentUri.getFilePath(requireContext())
                             ?: return false
-                        sendImageMessage(url.toUri())
+                        getEditorResult.launch(url.toUri())
                     }
                     return true
                 }
@@ -2257,7 +2260,7 @@ class ConversationFragment() :
                 if (isVideo) {
                     sendVideoMessage(uri)
                 } else {
-                    sendImageMessage(uri)
+                    getEditorResult.launch(uri)
                 }
                 releaseChatControl(FLING_DOWN)
             }
@@ -2580,12 +2583,12 @@ class ConversationFragment() :
                 if (data.hasExtra(IS_VIDEO)) {
                     sendVideoMessage(it)
                 } else {
-                    sendImageMessage(it)
+                    getEditorResult.launch(it)
                 }
             }
         } else if (requestCode == REQUEST_CAMERA && resultCode == Activity.RESULT_OK) {
             imageUri?.let { imageUri ->
-                showPreview(imageUri) { sendImageMessage(it) }
+                showPreview(imageUri) { getEditorResult.launch(it) }
             }
         } else if (requestCode == REQUEST_FILE && resultCode == Activity.RESULT_OK) {
             val uri = data?.data ?: return
@@ -2940,6 +2943,13 @@ class ConversationFragment() :
                 snackbar?.config(binding.barLayout.context)
             }
         snackbar?.show()
+    }
+
+    private fun callbackEditor(data: Intent?) {
+        val uri = data?.getParcelableExtra<Uri>(ImageEditorActivity.ARGS_EDITOR_RESULT)
+        if (uri != null) {
+            sendImageMessage(uri)
+        }
     }
 
     private fun displayReplyView() {
